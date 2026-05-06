@@ -124,11 +124,33 @@ export function calcularHorariosEnLotes(
     return slots
   }
 
-  // Modo secuencial: mostrar solo el primer bloque con turnos disponibles
+  // Modo secuencial: sin huecos
   if (llenadoSecuencial) {
+    if (tipo === 'primera_consulta') {
+      // Primera consulta: primer bloque con slots disponibles
+      for (const lote of lotesOrdenados) {
+        const slots = slotsDeLote(lote)
+        if (slots.some(s => s.disponible)) return slots
+      }
+      return []
+    }
+
+    // Seguimiento: ofrecer el siguiente slot pegado al último turno del bloque
     for (const lote of lotesOrdenados) {
-      const slots = slotsDeLote(lote)
-      if (slots.some(s => s.disponible)) return slots
+      const loteIni = timeToMinutes(lote.hora_inicio)
+      const loteFin = timeToMinutes(lote.hora_fin)
+
+      const ocupadosEnBloque = ocupados.filter(
+        occ => timeToMinutes(occ.hora) >= loteIni && timeToMinutes(occ.hora) < loteFin
+      )
+
+      const nextStart = ocupadosEnBloque.length > 0
+        ? Math.max(...ocupadosEnBloque.map(o => timeToMinutes(o.hora) + o.duracion))
+        : loteIni
+
+      if (nextStart + duracionNueva <= loteFin) {
+        return [{ hora: minutesToTime(nextStart), disponible: true }]
+      }
     }
     return []
   }

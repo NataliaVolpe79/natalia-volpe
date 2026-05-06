@@ -160,7 +160,7 @@ export default function SacarTurnoPage() {
       if (data.encontrado) {
         const p = data.paciente as PacienteEncontrado
         setPacienteEncontrado(p)
-        const duracion = p.duracion_seguimiento_minutos ?? 30
+        const duracion = p.duracion_seguimiento_minutos ?? 20
         setDuracionTurno(duracion)
       } else {
         setNoEncontrado(true)
