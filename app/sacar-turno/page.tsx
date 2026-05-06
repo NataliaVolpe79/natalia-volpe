@@ -90,7 +90,7 @@ export default function SacarTurnoPage() {
         duracion: t.duracion_minutos,
       }))
 
-      const h = calcularHorariosEnLotes(lotesData || [], ocupados, duracion, tipo, cfg.buffer_minutos)
+      const h = calcularHorariosEnLotes(lotesData || [], ocupados, duracion, tipo, cfg.buffer_minutos, true)
       setHorarios(h)
       setPaso(3)
     } finally {

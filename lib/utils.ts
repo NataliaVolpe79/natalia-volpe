@@ -93,51 +93,57 @@ export function calcularHorariosEnLotes(
   ocupados: TurnoOcupado[],
   duracionNueva: number,
   tipo: 'primera_consulta' | 'seguimiento',
-  bufferMinutos: number = 0
+  bufferMinutos: number = 0,
+  llenadoSecuencial: boolean = false
 ): HorarioDisponible[] {
-  const result: HorarioDisponible[] = []
-  const vistos = new Set<string>()
-
   const lotesOrdenados = [...lotes].sort(
     (a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio)
   )
 
-  for (const lote of lotesOrdenados) {
+  const slotsDeLote = (lote: LoteHorario): HorarioDisponible[] => {
+    const slots: HorarioDisponible[] = []
     if (tipo === 'primera_consulta') {
       for (const horaStr of lote.horarios_primera_consulta) {
-        if (vistos.has(horaStr)) continue
-        vistos.add(horaStr)
-        // Verificar que la hora está dentro del lote
         const hMins = timeToMinutes(horaStr)
         const loteIni = timeToMinutes(lote.hora_inicio)
         const loteFin = timeToMinutes(lote.hora_fin)
         if (hMins < loteIni || hMins + duracionNueva > loteFin) continue
-
-        result.push({
-          hora: horaStr,
-          disponible: !hayConflicto(horaStr, duracionNueva, ocupados),
-        })
+        slots.push({ hora: horaStr, disponible: !hayConflicto(horaStr, duracionNueva, ocupados) })
       }
     } else {
       const loteIni = timeToMinutes(lote.hora_inicio)
       const loteFin = timeToMinutes(lote.hora_fin)
       const step = duracionNueva + bufferMinutos
-
       let actual = loteIni
       while (actual + duracionNueva <= loteFin) {
         const horaStr = minutesToTime(actual)
-        if (!vistos.has(horaStr)) {
-          vistos.add(horaStr)
-          result.push({
-            hora: horaStr,
-            disponible: !hayConflicto(horaStr, duracionNueva, ocupados),
-          })
-        }
+        slots.push({ hora: horaStr, disponible: !hayConflicto(horaStr, duracionNueva, ocupados) })
         actual += step
       }
     }
+    return slots
   }
 
+  // Modo secuencial: mostrar solo el primer bloque con turnos disponibles
+  if (llenadoSecuencial) {
+    for (const lote of lotesOrdenados) {
+      const slots = slotsDeLote(lote)
+      if (slots.some(s => s.disponible)) return slots
+    }
+    return []
+  }
+
+  // Modo normal: todos los bloques juntos
+  const vistos = new Set<string>()
+  const result: HorarioDisponible[] = []
+  for (const lote of lotesOrdenados) {
+    for (const slot of slotsDeLote(lote)) {
+      if (!vistos.has(slot.hora)) {
+        vistos.add(slot.hora)
+        result.push(slot)
+      }
+    }
+  }
   return result
 }
 

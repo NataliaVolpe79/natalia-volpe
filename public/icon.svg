@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="90" fill="#06b6d4"/>
+  <!-- Calendario body -->
+  <rect x="90" y="160" width="332" height="272" rx="28" fill="white"/>
+  <!-- Calendario header -->
+  <rect x="90" y="160" width="332" height="88" rx="28" fill="#0891b2"/>
+  <rect x="90" y="218" width="332" height="30" fill="#0891b2"/>
+  <!-- Argollas -->
+  <rect x="166" y="118" width="28" height="72" rx="14" fill="white"/>
+  <rect x="318" y="118" width="28" height="72" rx="14" fill="white"/>
+  <!-- Cruz médica -->
+  <rect x="234" y="296" width="44" height="100" rx="10" fill="#06b6d4"/>
+  <rect x="200" y="330" width="112" height="44" rx="10" fill="#06b6d4"/>
+</svg>

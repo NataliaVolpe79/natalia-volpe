@@ -1,0 +1,19 @@
+{
+  "name": "Turnos · Dra. Natalia Volpe",
+  "short_name": "Dra. Volpe",
+  "description": "Reservá tu turno con la Dra. Natalia Hebe Volpe, Médica Psiquiatra.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06b6d4",
+  "theme_color": "#06b6d4",
+  "lang": "es",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
