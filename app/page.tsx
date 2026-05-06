@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Calendar, Phone, MessageCircle, Star } from 'lucide-react'
+import { Calendar, Phone, MessageCircle, Star, ClipboardList } from 'lucide-react'
 import Button from '@/components/ui/Button'
 
 const NOMBRE_DOCTORA = process.env.NEXT_PUBLIC_NOMBRE_DOCTORA || 'Dra. Natalia Hebe Volpe'
@@ -61,6 +61,13 @@ export default function HomePage() {
             <Button size="lg" fullWidth className="text-xl py-5 shadow-lg shadow-blue-200">
               <Calendar className="w-6 h-6" />
               Sacar turno
+            </Button>
+          </Link>
+
+          <Link href="/mis-turnos" className="w-full">
+            <Button size="lg" fullWidth variant="secondary" className="text-xl py-5">
+              <ClipboardList className="w-6 h-6" />
+              Ver mis turnos
             </Button>
           </Link>
         </motion.div>
