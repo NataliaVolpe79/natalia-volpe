@@ -34,8 +34,9 @@ export default function SacarTurnoPage() {
   const [telefono, setTelefono] = useState('')
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
-  const [errNombre, setErrNombre] = useState('')
-  const [errApellido, setErrApellido] = useState('')
+  const [dni, setDni] = useState('')
+  const [credencial, setCredencial] = useState('')
+  const [errores, setErrores] = useState<Record<string, string>>({})
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [esPrimeraTurno, setEsPrimeraTurno] = useState(false)
 
@@ -90,27 +91,34 @@ export default function SacarTurnoPage() {
   // ----------------------------------------------------------------
 
   async function registrarYContinuar() {
-    const errores = { n: '', a: '' }
-    if (!nombre.trim()) errores.n = 'Ingresá tu nombre'
-    if (!apellido.trim()) errores.a = 'Ingresá tu apellido'
-    setErrNombre(errores.n)
-    setErrApellido(errores.a)
-    if (errores.n || errores.a) return
+    const e: Record<string, string> = {}
+    if (!nombre.trim()) e.nombre = 'Ingresá tu nombre'
+    if (!apellido.trim()) e.apellido = 'Ingresá tu apellido'
+    if (!dni.trim()) e.dni = 'Ingresá tu DNI'
+    else if (!/^\d{7,8}$/.test(dni.replace(/\D/g, ''))) e.dni = 'DNI inválido (7 u 8 dígitos)'
+    setErrores(e)
+    if (Object.keys(e).length > 0) return
 
     setLoading(true)
     setError('')
     try {
       const tel = telefono.replace(/\D/g, '')
-      const { data, error: e } = await supabase
+      const { data, error: err } = await supabase
         .from('pacientes')
-        .insert({ nombre: nombre.trim(), apellido: apellido.trim(), telefono: tel })
+        .insert({
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          telefono: tel,
+          dni: dni.replace(/\D/g, ''),
+          numero_afiliado: credencial.trim() || null,
+        })
         .select('id, nombre, apellido')
         .single()
-      if (e || !data) throw new Error('No se pudo crear tu cuenta')
+      if (err || !data) throw new Error('No se pudo crear tu cuenta')
       setPaciente(data)
       setPaso(2)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Hubo un error. Intentá de nuevo.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Hubo un error. Intentá de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -311,7 +319,7 @@ export default function SacarTurnoPage() {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-1">Completá tus datos</h1>
                 <p className="text-gray-500">
-                  Es tu primera vez en el sistema. Ingresá tu nombre para registrarte.
+                  Primera vez en el sistema. Completá tu información para registrarte.
                 </p>
               </div>
 
@@ -322,11 +330,19 @@ export default function SacarTurnoPage() {
                   📱 WhatsApp: <strong>{telefono}</strong>
                 </div>
                 <Input label="Nombre" placeholder="María"
-                  value={nombre} error={errNombre}
-                  onChange={e => { setNombre(e.target.value); setErrNombre('') }} />
+                  value={nombre} error={errores.nombre}
+                  onChange={e => { setNombre(e.target.value); setErrores(p => ({ ...p, nombre: '' })) }} />
                 <Input label="Apellido" placeholder="García"
-                  value={apellido} error={errApellido}
-                  onChange={e => { setApellido(e.target.value); setErrApellido('') }} />
+                  value={apellido} error={errores.apellido}
+                  onChange={e => { setApellido(e.target.value); setErrores(p => ({ ...p, apellido: '' })) }} />
+                <Input label="DNI" placeholder="12345678"
+                  type="tel" inputMode="numeric"
+                  value={dni} error={errores.dni}
+                  onChange={e => { setDni(e.target.value); setErrores(p => ({ ...p, dni: '' })) }} />
+                <Input label="Número de credencial (obra social)" placeholder="Ej: 123456789"
+                  hint="Opcional"
+                  value={credencial}
+                  onChange={e => setCredencial(e.target.value)} />
               </div>
 
               <Button size="lg" fullWidth onClick={registrarYContinuar} loading={loading}>

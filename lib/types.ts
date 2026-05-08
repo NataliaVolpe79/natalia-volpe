@@ -34,6 +34,7 @@ export interface Paciente {
   nombre: string
   apellido: string
   telefono: string
+  dni?: string
   email?: string
   fecha_nacimiento?: string
   obra_social?: string
