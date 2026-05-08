@@ -210,6 +210,19 @@ export default function SacarTurnoPage() {
             <ChevronRight className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Leyenda */}
+        <div className="flex gap-3 mb-3 text-xs font-semibold">
+          <span className="flex items-center gap-1.5 text-blue-700">
+            <span className="w-3 h-3 rounded-sm bg-blue-100 border border-blue-300 inline-block" />
+            💻 Videollamada
+          </span>
+          <span className="flex items-center gap-1.5 text-green-700">
+            <span className="w-3 h-3 rounded-sm bg-green-100 border border-green-300 inline-block" />
+            📍 Presencial
+          </span>
+        </div>
+
         <div className="grid grid-cols-7 mb-2">
           {DIAS_SEMANA.map(d => (
             <div key={d} className="text-center text-sm font-semibold text-gray-400 py-2">{d}</div>
@@ -220,6 +233,7 @@ export default function SacarTurnoPage() {
           {dias.map(dia => {
             const fechaStr = format(dia, 'yyyy-MM-dd')
             const disponible = esDiaLaborable(fechaStr, config) && !isBefore(dia, hoy)
+            const esPresencial = disponible && getModalidadPorFecha(fechaStr, config) === 'presencial'
             const sel = fechaStr === fechaSeleccionada
             return (
               <button
@@ -227,13 +241,20 @@ export default function SacarTurnoPage() {
                 disabled={!disponible || loading}
                 onClick={() => disponible && seleccionarFecha(fechaStr)}
                 className={[
-                  'aspect-square rounded-xl text-base font-semibold transition-all',
-                  sel ? 'bg-blue-600 text-white shadow-md' :
-                  disponible ? 'bg-blue-50 text-blue-800 hover:bg-blue-100 active:scale-95' :
-                  'text-gray-300 cursor-not-allowed',
+                  'aspect-square rounded-xl text-base font-semibold transition-all flex flex-col items-center justify-center gap-0',
+                  sel
+                    ? esPresencial ? 'bg-green-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md'
+                    : disponible
+                    ? esPresencial ? 'bg-green-50 text-green-800 hover:bg-green-100 active:scale-95' : 'bg-blue-50 text-blue-800 hover:bg-blue-100 active:scale-95'
+                    : 'text-gray-300 cursor-not-allowed',
                 ].join(' ')}
               >
-                {format(dia, 'd')}
+                <span>{format(dia, 'd')}</span>
+                {disponible && (
+                  <span className="text-[9px] leading-none mt-0.5">
+                    {esPresencial ? '📍' : '💻'}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -383,11 +404,6 @@ export default function SacarTurnoPage() {
                 ) : <Calendario />}
               </div>
 
-              <div className="bg-blue-50 rounded-xl p-4 text-base text-blue-800">
-                <p className="font-semibold mb-1">Modalidades:</p>
-                <p>📍 <strong>Viernes:</strong> presencial</p>
-                <p>💻 <strong>Lunes a jueves:</strong> videollamada</p>
-              </div>
             </motion.div>
           )}
 
