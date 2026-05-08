@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CheckCircle, ArrowLeft, UserCheck, UserPlus, Phone, MessageCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle, ArrowLeft, Phone } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Alert from '@/components/ui/Alert'
@@ -13,13 +13,16 @@ import { supabase } from '@/lib/supabase'
 import { calcularHorariosEnLotes, getModalidadPorFecha, esDiaLaborable, formatHora } from '@/lib/utils'
 import { Configuracion } from '@/lib/types'
 
-const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_CONTACTO || '549XXXXXXXXXX'
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 const DURACION = 20
 
-type FlujoPaciente = 'nueva' | 'existente' | null
-type DatosNuevo = { nombre: string; apellido: string; telefono: string }
-type PacienteEncontrado = { id: string; nombre: string; apellido: string }
+// paso 0: buscar teléfono
+// paso 1: registrar (solo si no existe)
+// paso 2: elegir día
+// paso 3: elegir hora
+// paso 4: confirmación
+
+type Paciente = { id: string; nombre: string; apellido: string }
 
 export default function SacarTurnoPage() {
   const router = useRouter()
@@ -27,16 +30,14 @@ export default function SacarTurnoPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const [flujo, setFlujo] = useState<FlujoPaciente>(null)
-
-  // Paso 1a — nuevo paciente
-  const [datosNuevo, setDatosNuevo] = useState<DatosNuevo>({ nombre: '', apellido: '', telefono: '' })
-  const [erroresDatos, setErroresDatos] = useState<Partial<DatosNuevo>>({})
-
-  // Paso 1b — paciente existente
-  const [telefonoBusqueda, setTelefonoBusqueda] = useState('')
-  const [pacienteEncontrado, setPacienteEncontrado] = useState<PacienteEncontrado | null>(null)
-  const [noEncontrado, setNoEncontrado] = useState(false)
+  // Datos del paciente
+  const [telefono, setTelefono] = useState('')
+  const [nombre, setNombre] = useState('')
+  const [apellido, setApellido] = useState('')
+  const [errNombre, setErrNombre] = useState('')
+  const [errApellido, setErrApellido] = useState('')
+  const [paciente, setPaciente] = useState<Paciente | null>(null)
+  const [esPrimeraTurno, setEsPrimeraTurno] = useState(false)
 
   // Calendario / horarios
   const [config, setConfig] = useState<Configuracion | null>(null)
@@ -47,20 +48,86 @@ export default function SacarTurnoPage() {
   const [mesActual, setMesActual] = useState(new Date())
 
   // ----------------------------------------------------------------
-  // Helpers
+  // Paso 0 — buscar teléfono
   // ----------------------------------------------------------------
 
-  async function cargarConfig() {
-    const { data } = await supabase.from('configuracion').select('*').single()
-    if (data) setConfig(data)
-    return data as Configuracion | null
+  async function buscarTelefono() {
+    const tel = telefono.replace(/\D/g, '')
+    if (tel.length < 8) { setError('Ingresá tu teléfono completo (sin el 15)'); return }
+    setLoading(true)
+    setError('')
+    try {
+      // Cargar config y buscar paciente en paralelo
+      const [configRes, pacienteRes] = await Promise.all([
+        supabase.from('configuracion').select('*').single(),
+        fetch('/api/buscar-paciente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telefono: tel }),
+        }),
+      ])
+
+      if (configRes.data) setConfig(configRes.data)
+
+      const data = await pacienteRes.json()
+      if (data.encontrado) {
+        setPaciente(data.paciente as Paciente)
+        setEsPrimeraTurno(false)
+        setPaso(2)
+      } else {
+        setEsPrimeraTurno(true)
+        setPaso(1)
+      }
+    } catch {
+      setError('Hubo un error. Intentá de nuevo.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  async function cargarHorarios(fecha: string, cfg: Configuracion) {
+  // ----------------------------------------------------------------
+  // Paso 1 — registrar paciente nuevo
+  // ----------------------------------------------------------------
+
+  async function registrarYContinuar() {
+    const errores = { n: '', a: '' }
+    if (!nombre.trim()) errores.n = 'Ingresá tu nombre'
+    if (!apellido.trim()) errores.a = 'Ingresá tu apellido'
+    setErrNombre(errores.n)
+    setErrApellido(errores.a)
+    if (errores.n || errores.a) return
+
+    setLoading(true)
+    setError('')
+    try {
+      const tel = telefono.replace(/\D/g, '')
+      const { data, error: e } = await supabase
+        .from('pacientes')
+        .insert({ nombre: nombre.trim(), apellido: apellido.trim(), telefono: tel })
+        .select('id, nombre, apellido')
+        .single()
+      if (e || !data) throw new Error('No se pudo crear tu cuenta')
+      setPaciente(data)
+      setPaso(2)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Hubo un error. Intentá de nuevo.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Paso 2 → elegir fecha
+  // ----------------------------------------------------------------
+
+  async function seleccionarFecha(fecha: string) {
+    if (!config) return
+    setFechaSeleccionada(fecha)
+    setHoraSeleccionada('')
     setLoading(true)
     try {
       const diaSemana = format(parseISO(fecha), 'EEEE', { locale: es }).toLowerCase()
-      setModalidad(getModalidadPorFecha(fecha, cfg))
+      setModalidad(getModalidadPorFecha(fecha, config))
 
       const [{ data: lotesData }, { data: turnosData }] = await Promise.all([
         supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden'),
@@ -81,99 +148,22 @@ export default function SacarTurnoPage() {
   }
 
   // ----------------------------------------------------------------
-  // Paso 0
-  // ----------------------------------------------------------------
-
-  function elegirPrimeraConsulta() {
-    setFlujo('nueva')
-    setPaso(1)
-  }
-
-  async function elegirPacienteExistente() {
-    setFlujo('existente')
-    setLoading(true)
-    try {
-      const cfg = await cargarConfig()
-      if (cfg) setPaso(1)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ----------------------------------------------------------------
-  // Paso 1a — nuevo paciente
-  // ----------------------------------------------------------------
-
-  function validarDatos(): boolean {
-    const e: Partial<DatosNuevo> = {}
-    if (!datosNuevo.nombre.trim()) e.nombre = 'Ingresá tu nombre'
-    if (!datosNuevo.apellido.trim()) e.apellido = 'Ingresá tu apellido'
-    if (!datosNuevo.telefono.trim()) e.telefono = 'Ingresá tu teléfono'
-    else if (!/^\d{8,12}$/.test(datosNuevo.telefono.replace(/\s/g, '')))
-      e.telefono = 'Solo números, sin el 15 (ej: 1154321234)'
-    setErroresDatos(e)
-    return Object.keys(e).length === 0
-  }
-
-  function avanzarDesdeNuevo() {
-    if (validarDatos()) setPaso(4)
-  }
-
-  // ----------------------------------------------------------------
-  // Paso 1b — paciente existente
-  // ----------------------------------------------------------------
-
-  async function buscarPaciente() {
-    const tel = telefonoBusqueda.replace(/\D/g, '')
-    if (tel.length < 8) { setError('Ingresá tu teléfono completo (sin el 15)'); return }
-    setLoading(true)
-    setError('')
-    setPacienteEncontrado(null)
-    setNoEncontrado(false)
-    try {
-      const res = await fetch('/api/buscar-paciente', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefono: tel }),
-      })
-      const data = await res.json()
-      if (data.encontrado) setPacienteEncontrado(data.paciente as PacienteEncontrado)
-      else setNoEncontrado(true)
-    } catch {
-      setError('No se pudo verificar tu teléfono. Intentá de nuevo.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ----------------------------------------------------------------
-  // Paso 2 → fecha
-  // ----------------------------------------------------------------
-
-  async function seleccionarFecha(fecha: string) {
-    if (!config) return
-    setFechaSeleccionada(fecha)
-    setHoraSeleccionada('')
-    await cargarHorarios(fecha, config)
-  }
-
-  // ----------------------------------------------------------------
   // Paso 3 → confirmar turno
   // ----------------------------------------------------------------
 
   async function confirmarTurno() {
-    if (!horaSeleccionada || !fechaSeleccionada || !pacienteEncontrado) return
+    if (!horaSeleccionada || !fechaSeleccionada || !paciente) return
     setLoading(true)
     setError('')
     try {
       const { error: e } = await supabase.from('turnos').insert({
-        paciente_id: pacienteEncontrado.id,
+        paciente_id: paciente.id,
         fecha: fechaSeleccionada,
         hora: horaSeleccionada,
         duracion_minutos: DURACION,
         modalidad,
         estado: 'pendiente',
-        tipo_turno: 'seguimiento',
+        tipo_turno: esPrimeraTurno ? 'primera_consulta' : 'seguimiento',
       })
       if (e) throw new Error('No se pudo reservar el turno')
       setPaso(4)
@@ -241,14 +231,12 @@ export default function SacarTurnoPage() {
     )
   }
 
-  const nombrePaciente = flujo === 'existente' && pacienteEncontrado
-    ? `${pacienteEncontrado.nombre} ${pacienteEncontrado.apellido}`
-    : `${datosNuevo.nombre} ${datosNuevo.apellido}`.trim()
+  const nombreCompleto = paciente
+    ? `${paciente.nombre} ${paciente.apellido}`
+    : `${nombre} ${apellido}`.trim()
 
   const totalPasos = 3
   const pasoDisplay = Math.min(paso, totalPasos)
-
-  const mensajeWANuevo = `Hola! Me llamo ${datosNuevo.nombre} ${datosNuevo.apellido} y quisiera sacar un turno para mi primera consulta. Mi WhatsApp: ${datosNuevo.telefono}`
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -262,12 +250,12 @@ export default function SacarTurnoPage() {
           </button>
           <div>
             <p className="text-sm text-gray-500">Reservar turno</p>
-            {paso > 0 && paso < 4 && flujo === 'existente' && (
+            {paso > 0 && paso < 4 && (
               <p className="text-base font-bold text-gray-900">Paso {pasoDisplay} de {totalPasos}</p>
             )}
           </div>
         </div>
-        {paso > 0 && paso < 4 && flujo === 'existente' && (
+        {paso > 0 && paso < 4 && (
           <div className="h-1 bg-gray-100">
             <div className="h-full bg-blue-600 transition-all duration-500"
               style={{ width: `${(pasoDisplay / totalPasos) * 100}%` }} />
@@ -278,102 +266,15 @@ export default function SacarTurnoPage() {
       <main className="max-w-lg mx-auto px-6 py-8">
         <AnimatePresence mode="wait">
 
-          {/* ======= PASO 0: Tipo de paciente ======= */}
+          {/* ======= PASO 0: Teléfono ======= */}
           {paso === 0 && (
             <motion.div key="paso0"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
               className="flex flex-col gap-6"
             >
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">¿Cómo es tu consulta?</h1>
-                <p className="text-gray-500 text-lg">Elegí una opción para continuar.</p>
-              </div>
-
-              <button
-                onClick={elegirPrimeraConsulta}
-                className="w-full bg-white rounded-2xl border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-50 p-6 text-left transition-all active:scale-[0.98]"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center shrink-0">
-                    <UserPlus className="w-7 h-7 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-gray-900">Es mi primera consulta</p>
-                    <p className="text-base text-gray-500 mt-1">Nunca consulté con la Dra. Volpe.</p>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={elegirPacienteExistente}
-                disabled={loading}
-                className="w-full bg-white rounded-2xl border-2 border-green-200 hover:border-green-500 hover:bg-green-50 p-6 text-left transition-all active:scale-[0.98] disabled:opacity-60"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center shrink-0">
-                    <UserCheck className="w-7 h-7 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-gray-900">Ya soy paciente</p>
-                    <p className="text-base text-gray-500 mt-1">Tengo consultas previas con la Dra. Volpe.</p>
-                  </div>
-                </div>
-              </button>
-
-              {loading && (
-                <div className="flex justify-center">
-                  <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full" />
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* ======= PASO 1a: Datos nuevo paciente ======= */}
-          {paso === 1 && flujo === 'nueva' && (
-            <motion.div key="paso1a"
-              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
-              className="flex flex-col gap-6"
-            >
-              <div>
-                <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full text-sm font-semibold mb-3">
-                  <UserPlus className="w-4 h-4" /> Primera consulta
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">Tus datos</h1>
-                <p className="text-gray-500">Completá tus datos y te conectamos con la Dra. Volpe por WhatsApp para coordinar el turno.</p>
-              </div>
-
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col gap-5">
-                <Input label="Nombre" placeholder="María"
-                  value={datosNuevo.nombre} error={erroresDatos.nombre}
-                  onChange={e => setDatosNuevo(d => ({ ...d, nombre: e.target.value }))} />
-                <Input label="Apellido" placeholder="García"
-                  value={datosNuevo.apellido} error={erroresDatos.apellido}
-                  onChange={e => setDatosNuevo(d => ({ ...d, apellido: e.target.value }))} />
-                <Input label="Teléfono de WhatsApp" placeholder="1154321234" type="tel"
-                  inputMode="numeric" hint="Sin el 15, solo números"
-                  value={datosNuevo.telefono} error={erroresDatos.telefono}
-                  onChange={e => setDatosNuevo(d => ({ ...d, telefono: e.target.value }))} />
-              </div>
-
-              <Button size="lg" fullWidth onClick={avanzarDesdeNuevo}>
-                <MessageCircle className="w-5 h-5" />
-                Coordinar por WhatsApp →
-              </Button>
-            </motion.div>
-          )}
-
-          {/* ======= PASO 1b: Buscar paciente existente ======= */}
-          {paso === 1 && flujo === 'existente' && (
-            <motion.div key="paso1b"
-              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
-              className="flex flex-col gap-6"
-            >
-              <div>
-                <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-sm font-semibold mb-3">
-                  <UserCheck className="w-4 h-4" /> Paciente existente
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">Buscá tu número</h1>
-                <p className="text-gray-500">Ingresá el mismo teléfono con el que te registraste.</p>
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Sacar turno</h1>
+                <p className="text-gray-500 text-lg">Ingresá tu número de WhatsApp para continuar.</p>
               </div>
 
               {error && <Alert type="error">{error}</Alert>}
@@ -385,53 +286,52 @@ export default function SacarTurnoPage() {
                   type="tel"
                   inputMode="numeric"
                   hint="Sin el 15, solo números"
-                  value={telefonoBusqueda}
-                  onChange={e => {
-                    setTelefonoBusqueda(e.target.value)
-                    setPacienteEncontrado(null)
-                    setNoEncontrado(false)
-                  }}
+                  value={telefono}
+                  onChange={e => { setTelefono(e.target.value); setError('') }}
+                  onKeyDown={e => e.key === 'Enter' && buscarTelefono()}
                 />
-                <Button onClick={buscarPaciente} loading={loading} fullWidth>
+                <Button onClick={buscarTelefono} loading={loading} fullWidth size="lg">
                   <Phone className="w-5 h-5" />
-                  Buscar mi número
+                  Continuar
                 </Button>
               </div>
 
-              {pacienteEncontrado && (
-                <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}>
-                  <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
-                    <div className="flex items-center gap-3 mb-3">
-                      <CheckCircle className="w-6 h-6 text-green-600 shrink-0" />
-                      <p className="font-bold text-green-900 text-lg">¡Te encontramos!</p>
-                    </div>
-                    <p className="text-green-800 text-lg font-semibold">
-                      {pacienteEncontrado.nombre} {pacienteEncontrado.apellido}
-                    </p>
-                  </div>
-                  <Button size="lg" fullWidth className="mt-4" onClick={() => setPaso(2)}>
-                    Ver horarios disponibles →
-                  </Button>
-                </motion.div>
-              )}
+              <p className="text-center text-sm text-gray-400">
+                Si ya sacaste un turno antes, te reconocemos automáticamente.
+              </p>
+            </motion.div>
+          )}
 
-              {noEncontrado && (
-                <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}>
-                  <Alert type="warning">
-                    <p className="font-bold mb-2">No encontramos tu número</p>
-                    <p className="mb-3">Si es tu primera consulta, coordinala por WhatsApp:</p>
-                    <a
-                      href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent('Hola, quisiera sacar un turno para una primera consulta con la Dra. Volpe')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-3 rounded-xl font-bold text-base hover:bg-green-600 transition-colors"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                      Escribir por WhatsApp
-                    </a>
-                  </Alert>
-                </motion.div>
-              )}
+          {/* ======= PASO 1: Registro (paciente nuevo) ======= */}
+          {paso === 1 && (
+            <motion.div key="paso1"
+              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+              className="flex flex-col gap-6"
+            >
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">Completá tus datos</h1>
+                <p className="text-gray-500">
+                  Es tu primera vez en el sistema. Ingresá tu nombre para registrarte.
+                </p>
+              </div>
+
+              {error && <Alert type="error">{error}</Alert>}
+
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col gap-5">
+                <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-600">
+                  📱 WhatsApp: <strong>{telefono}</strong>
+                </div>
+                <Input label="Nombre" placeholder="María"
+                  value={nombre} error={errNombre}
+                  onChange={e => { setNombre(e.target.value); setErrNombre('') }} />
+                <Input label="Apellido" placeholder="García"
+                  value={apellido} error={errApellido}
+                  onChange={e => { setApellido(e.target.value); setErrApellido('') }} />
+              </div>
+
+              <Button size="lg" fullWidth onClick={registrarYContinuar} loading={loading}>
+                Registrarme y ver turnos →
+              </Button>
             </motion.div>
           )}
 
@@ -442,6 +342,14 @@ export default function SacarTurnoPage() {
               className="flex flex-col gap-6"
             >
               <div>
+                {paciente && (
+                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4">
+                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                    <span className="text-green-800 font-semibold">
+                      Hola, {paciente.nombre} {paciente.apellido}
+                    </span>
+                  </div>
+                )}
                 <h1 className="text-2xl font-bold text-gray-900 mb-1">Elegí el día</h1>
                 <p className="text-gray-500">Los días resaltados tienen turnos disponibles.</p>
               </div>
@@ -528,59 +436,9 @@ export default function SacarTurnoPage() {
             </motion.div>
           )}
 
-          {/* ======= PASO 4a: WhatsApp para primera consulta ======= */}
-          {paso === 4 && flujo === 'nueva' && (
-            <motion.div key="paso4a"
-              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center text-center gap-8 py-8"
-            >
-              <motion.div
-                initial={{ scale: 0 }} animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.15, stiffness: 200 }}
-                className="w-28 h-28 bg-green-100 rounded-full flex items-center justify-center"
-              >
-                <MessageCircle className="w-16 h-16 text-green-600" />
-              </motion.div>
-
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-3">¡Casi listo!</h1>
-                <p className="text-gray-500 text-lg">
-                  Tocá el botón para enviarle un mensaje a la Dra. Volpe y coordinar el día y horario de tu primera consulta.
-                </p>
-              </div>
-
-              <div className="w-full bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-left flex flex-col gap-3">
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-gray-500">Nombre</span>
-                  <span className="font-bold text-gray-900">{nombrePaciente}</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-gray-500">WhatsApp</span>
-                  <span className="font-bold text-gray-900">{datosNuevo.telefono}</span>
-                </div>
-              </div>
-
-              <a
-                href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(mensajeWANuevo)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-              >
-                <Button size="lg" fullWidth variant="success">
-                  <MessageCircle className="w-6 h-6" />
-                  Escribir a la Dra. por WhatsApp
-                </Button>
-              </a>
-
-              <Button size="lg" fullWidth variant="secondary" onClick={() => router.push('/')}>
-                Volver al inicio
-              </Button>
-            </motion.div>
-          )}
-
-          {/* ======= PASO 4b: Confirmación turno existente ======= */}
-          {paso === 4 && flujo === 'existente' && (
-            <motion.div key="paso4b"
+          {/* ======= PASO 4: Confirmación ======= */}
+          {paso === 4 && (
+            <motion.div key="paso4"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center text-center gap-8 py-8"
             >
@@ -600,7 +458,7 @@ export default function SacarTurnoPage() {
               <div className="w-full bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-left flex flex-col gap-4">
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
                   <span className="text-gray-500">Nombre</span>
-                  <span className="font-bold text-gray-900 text-lg">{nombrePaciente}</span>
+                  <span className="font-bold text-gray-900 text-lg">{nombreCompleto}</span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
                   <span className="text-gray-500">Fecha</span>
@@ -629,9 +487,14 @@ export default function SacarTurnoPage() {
                 <strong>1 hora antes</strong> de tu turno.
               </Alert>
 
-              <Button size="lg" fullWidth variant="secondary" onClick={() => router.push('/')}>
-                Volver al inicio
-              </Button>
+              <div className="w-full flex flex-col gap-3">
+                <Button size="lg" fullWidth onClick={() => router.push('/mis-turnos')}>
+                  Ver mis turnos
+                </Button>
+                <Button size="lg" fullWidth variant="secondary" onClick={() => router.push('/')}>
+                  Volver al inicio
+                </Button>
+              </div>
             </motion.div>
           )}
 
