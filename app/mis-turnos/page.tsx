@@ -3,15 +3,20 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { format, parseISO, isFuture, isToday } from 'date-fns'
+import { format, parseISO, isFuture, isToday, addDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Phone, Calendar, Clock, Video, MapPin, ArrowLeft, X, CheckCircle } from 'lucide-react'
+import { Phone, Calendar, Clock, Video, MapPin, ArrowLeft, X, CheckCircle, ChevronLeft, ChevronRight, Edit2, MessageCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Alert from '@/components/ui/Alert'
 import { supabase } from '@/lib/supabase'
+import { calcularHorariosEnLotes, esDiaLaborable, getModalidadPorFecha, formatFecha } from '@/lib/utils'
+import { Configuracion } from '@/lib/types'
 
 const LS_KEY = 'nv_paciente_tel'
+const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_CONTACTO || '549XXXXXXXXXX'
+const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+const DURACION = 20
 
 type Turno = {
   id: string
@@ -32,7 +37,17 @@ export default function MisTurnosPage() {
   const [nombrePaciente, setNombrePaciente] = useState('')
   const [encontrado, setEncontrado] = useState(false)
   const [cancelando, setCancelando] = useState<string | null>(null)
-  const [cancelado, setCancelado] = useState<string | null>(null)
+  const [canceladoWA, setCanceladoWA] = useState<string | null>(null)
+
+  // Modificar turno
+  const [config, setConfig] = useState<Configuracion | null>(null)
+  const [modificando, setModificando] = useState<string | null>(null)
+  const [modFecha, setModFecha] = useState('')
+  const [modHora, setModHora] = useState('')
+  const [modHorarios, setModHorarios] = useState<{ hora: string; disponible: boolean }[]>([])
+  const [modCargando, setModCargando] = useState(false)
+  const [modMes, setModMes] = useState(new Date())
+  const [modificadoWA, setModificadoWA] = useState<string | null>(null)
 
   useEffect(() => {
     const telGuardado = localStorage.getItem(LS_KEY)
@@ -83,14 +98,68 @@ export default function MisTurnosPage() {
   }
 
   async function cancelarTurno(id: string) {
+    const turno = turnos.find(t => t.id === id)
+    if (!turno) return
     setCancelando(id)
     try {
       await supabase.from('turnos').update({ estado: 'cancelado' }).eq('id', id)
       setTurnos(t => t.filter(x => x.id !== id))
-      setCancelado(id)
-      setTimeout(() => setCancelado(null), 3000)
+      const msg = `Hola Dra. Volpe! ${nombrePaciente} canceló su turno del ${formatFecha(turno.fecha)} a las ${turno.hora.substring(0, 5)} hs.`
+      setCanceladoWA(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`)
+      setModificadoWA(null)
     } finally {
       setCancelando(null)
+    }
+  }
+
+  async function iniciarModificacion(turnoId: string) {
+    if (modificando === turnoId) { setModificando(null); return }
+    if (!config) {
+      const { data } = await supabase.from('configuracion').select('*').single()
+      if (data) setConfig(data)
+    }
+    setModificando(turnoId)
+    setModFecha('')
+    setModHora('')
+    setModHorarios([])
+    setModMes(new Date())
+    setCanceladoWA(null)
+    setModificadoWA(null)
+  }
+
+  async function cargarHorariosModificacion(fecha: string, turnoId: string) {
+    setModCargando(true)
+    setModFecha(fecha)
+    setModHora('')
+    try {
+      const diaSemana = format(parseISO(fecha), 'EEEE', { locale: es }).toLowerCase()
+      const [{ data: lotes }, { data: ocupados }] = await Promise.all([
+        supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden'),
+        supabase.from('turnos').select('hora, duracion_minutos')
+          .eq('fecha', fecha)
+          .neq('id', turnoId)
+          .in('estado', ['pendiente', 'confirmado']),
+      ])
+      setModHorarios(calcularHorariosEnLotes(
+        lotes || [],
+        (ocupados || []).map(t => ({ hora: t.hora.substring(0, 5), duracion: t.duracion_minutos })),
+        DURACION, 'seguimiento', 0, false
+      ))
+    } finally {
+      setModCargando(false)
+    }
+  }
+
+  async function confirmarModificacion(turnoId: string, turnoOriginal: Turno) {
+    if (!modFecha || !modHora) return
+    try {
+      await supabase.from('turnos').update({ fecha: modFecha, hora: modHora }).eq('id', turnoId)
+      setTurnos(t => t.map(x => x.id === turnoId ? { ...x, fecha: modFecha, hora: modHora } : x))
+      const msg = `Hola Dra. Volpe! ${nombrePaciente} modificó su turno del ${formatFecha(turnoOriginal.fecha)} ${turnoOriginal.hora.substring(0, 5)} hs al ${formatFecha(modFecha)} ${modHora} hs.`
+      setModificadoWA(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`)
+      setModificando(null)
+    } catch {
+      setError('No se pudo modificar el turno. Intentá de nuevo.')
     }
   }
 
@@ -100,6 +169,59 @@ export default function MisTurnosPage() {
     setTurnos([])
     setNombrePaciente('')
     setTelefono('')
+  }
+
+  // Mini-calendario para modificar
+  function MiniCalendario({ turnoId }: { turnoId: string }) {
+    if (!config) return null
+    const hoy = startOfDay(new Date())
+    const inicio = startOfMonth(modMes)
+    const fin = endOfMonth(modMes)
+    const dias = eachDayOfInterval({ start: inicio, end: fin })
+    const primerDia = getDay(inicio)
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={() => setModMes(m => addDays(startOfMonth(m), -1))} className="p-1.5 rounded-lg hover:bg-gray-100">
+            <ChevronLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <span className="text-sm font-bold text-gray-800 capitalize">
+            {format(modMes, 'MMMM yyyy', { locale: es })}
+          </span>
+          <button onClick={() => setModMes(m => addDays(endOfMonth(m), 1))} className="p-1.5 rounded-lg hover:bg-gray-100">
+            <ChevronRight className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 mb-1">
+          {DIAS_SEMANA.map(d => (
+            <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d[0]}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0.5">
+          {Array.from({ length: primerDia }).map((_, i) => <div key={`e${i}`} />)}
+          {dias.map(dia => {
+            const fechaStr = format(dia, 'yyyy-MM-dd')
+            const disponible = esDiaLaborable(fechaStr, config) && !isBefore(dia, hoy)
+            const sel = fechaStr === modFecha
+            return (
+              <button
+                key={fechaStr}
+                disabled={!disponible || modCargando}
+                onClick={() => disponible && cargarHorariosModificacion(fechaStr, turnoId)}
+                className={[
+                  'aspect-square rounded-lg text-xs font-semibold transition-all',
+                  sel ? 'bg-blue-600 text-white' :
+                  disponible ? 'bg-blue-50 text-blue-800 hover:bg-blue-100' :
+                  'text-gray-300 cursor-not-allowed',
+                ].join(' ')}
+              >
+                {format(dia, 'd')}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -147,12 +269,7 @@ export default function MisTurnosPage() {
                   value={telefono}
                   onChange={e => setTelefono(e.target.value)}
                 />
-                <Button
-                  onClick={() => buscarTurnos(telefono)}
-                  loading={loading}
-                  fullWidth
-                  size="lg"
-                >
+                <Button onClick={() => buscarTurnos(telefono)} loading={loading} fullWidth size="lg">
                   <Phone className="w-5 h-5" />
                   Ver mis turnos
                 </Button>
@@ -166,8 +283,38 @@ export default function MisTurnosPage() {
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               className="flex flex-col gap-4"
             >
-              {cancelado && (
-                <Alert type="success">Turno cancelado correctamente.</Alert>
+              {/* Notificación de cancelación */}
+              {canceladoWA && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                  className="bg-green-50 border border-green-200 rounded-2xl p-4 flex flex-col gap-3"
+                >
+                  <p className="text-green-800 font-semibold flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" /> Turno cancelado correctamente.
+                  </p>
+                  <a href={canceladoWA} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Avisarle a la Dra. por WhatsApp
+                  </a>
+                </motion.div>
+              )}
+
+              {/* Notificación de modificación */}
+              {modificadoWA && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                  className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col gap-3"
+                >
+                  <p className="text-blue-800 font-semibold flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" /> Turno modificado correctamente.
+                  </p>
+                  <a href={modificadoWA} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Avisarle a la Dra. por WhatsApp
+                  </a>
+                </motion.div>
               )}
 
               {turnos.length === 0 ? (
@@ -184,9 +331,11 @@ export default function MisTurnosPage() {
                   <p className="text-sm text-gray-500 font-medium">
                     {turnos.length === 1 ? '1 turno próximo' : `${turnos.length} turnos próximos`}
                   </p>
+
                   {turnos.map(turno => {
                     const fecha = parseISO(turno.fecha)
                     const esHoy = isToday(fecha)
+                    const puedeModificar = isFuture(fecha) && !esHoy
                     return (
                       <motion.div
                         key={turno.id}
@@ -201,49 +350,124 @@ export default function MisTurnosPage() {
                             <CheckCircle className="w-4 h-4" /> Hoy
                           </div>
                         )}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2 text-gray-900">
-                              <Calendar className="w-5 h-5 text-blue-500 shrink-0" />
-                              <span className="text-lg font-bold capitalize">
-                                {format(fecha, "EEEE d 'de' MMMM", { locale: es })}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-gray-700">
-                              <Clock className="w-5 h-5 text-blue-500 shrink-0" />
-                              <span className="text-lg font-semibold">
-                                {turno.hora.substring(0, 5)} hs · {turno.duracion_minutos} min
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-gray-500">
-                              {turno.modalidad === 'presencial'
-                                ? <><MapPin className="w-5 h-5 shrink-0" /><span>Presencial</span></>
-                                : <><Video className="w-5 h-5 shrink-0" /><span>Videollamada</span></>
-                              }
-                            </div>
+
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2 text-gray-900">
+                            <Calendar className="w-5 h-5 text-blue-500 shrink-0" />
+                            <span className="text-lg font-bold capitalize">
+                              {format(fecha, "EEEE d 'de' MMMM", { locale: es })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Clock className="w-5 h-5 text-blue-500 shrink-0" />
+                            <span className="text-lg font-semibold">
+                              {turno.hora.substring(0, 5)} hs · {turno.duracion_minutos} min
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-500">
+                            {turno.modalidad === 'presencial'
+                              ? <><MapPin className="w-5 h-5 shrink-0" /><span>Presencial</span></>
+                              : <><Video className="w-5 h-5 shrink-0" /><span>Videollamada</span></>
+                            }
                           </div>
                         </div>
 
-                        {isFuture(fecha) && !esHoy && (
-                          <button
-                            onClick={() => cancelarTurno(turno.id)}
-                            disabled={cancelando === turno.id}
-                            className="mt-4 flex items-center gap-2 text-red-500 hover:text-red-700 text-sm font-semibold transition-colors disabled:opacity-50"
-                          >
-                            <X className="w-4 h-4" />
-                            {cancelando === turno.id ? 'Cancelando...' : 'Cancelar turno'}
-                          </button>
+                        {/* Botones cancelar / modificar */}
+                        {puedeModificar && (
+                          <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100">
+                            <button
+                              onClick={() => cancelarTurno(turno.id)}
+                              disabled={cancelando === turno.id}
+                              className="flex items-center gap-1.5 text-red-500 hover:text-red-700 text-sm font-semibold transition-colors disabled:opacity-50"
+                            >
+                              <X className="w-4 h-4" />
+                              {cancelando === turno.id ? 'Cancelando...' : 'Cancelar'}
+                            </button>
+                            <button
+                              onClick={() => iniciarModificacion(turno.id)}
+                              className={`flex items-center gap-1.5 text-sm font-semibold transition-colors ${modificando === turno.id ? 'text-gray-500' : 'text-blue-500 hover:text-blue-700'}`}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                              {modificando === turno.id ? 'Cancelar cambio' : 'Modificar'}
+                            </button>
+                          </div>
                         )}
+
+                        {/* Panel de modificación inline */}
+                        <AnimatePresence>
+                          {modificando === turno.id && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                {!modFecha ? (
+                                  <>
+                                    <p className="text-sm font-semibold text-gray-700 mb-3">Elegí el nuevo día:</p>
+                                    <MiniCalendario turnoId={turno.id} />
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center justify-between mb-3">
+                                      <p className="text-sm font-semibold text-gray-700">
+                                        Nuevo día: <span className="capitalize text-blue-700">
+                                          {format(parseISO(modFecha), "EEE d 'de' MMM", { locale: es })}
+                                        </span>
+                                      </p>
+                                      <button onClick={() => { setModFecha(''); setModHora('') }}
+                                        className="text-xs text-blue-500 underline">
+                                        cambiar
+                                      </button>
+                                    </div>
+
+                                    {modCargando ? (
+                                      <div className="flex justify-center py-4">
+                                        <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full" />
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <p className="text-xs text-gray-500 mb-2">Elegí el nuevo horario:</p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {modHorarios.filter(h => h.disponible).map(h => (
+                                            <button key={h.hora} onClick={() => setModHora(h.hora)}
+                                              className={[
+                                                'py-2.5 rounded-xl text-sm font-bold transition-all',
+                                                modHora === h.hora
+                                                  ? 'bg-blue-600 text-white shadow'
+                                                  : 'bg-blue-50 text-blue-800 hover:bg-blue-100',
+                                              ].join(' ')}
+                                            >
+                                              {h.hora}
+                                            </button>
+                                          ))}
+                                          {modHorarios.filter(h => h.disponible).length === 0 && (
+                                            <p className="col-span-3 text-gray-500 text-sm py-2 text-center">
+                                              Sin horarios disponibles para ese día.
+                                            </p>
+                                          )}
+                                        </div>
+                                        {modHora && (
+                                          <Button fullWidth size="sm" className="mt-3"
+                                            onClick={() => confirmarModificacion(turno.id, turno)}
+                                          >
+                                            Confirmar: mover al {modHora} hs
+                                          </Button>
+                                        )}
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </motion.div>
                     )
                   })}
 
-                  <Button
-                    onClick={() => router.push('/sacar-turno')}
-                    variant="secondary"
-                    fullWidth
-                    size="lg"
-                  >
+                  <Button onClick={() => router.push('/sacar-turno')} variant="secondary" fullWidth size="lg">
                     Sacar otro turno
                   </Button>
                 </>
