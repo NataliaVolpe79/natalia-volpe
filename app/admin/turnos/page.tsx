@@ -5,8 +5,8 @@ import { format, parseISO, addDays, addWeeks, startOfMonth, endOfMonth, startOfW
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus, Clock, Check, X, Edit2, Video, MapPin, Calendar, LayoutList } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { TurnoConPaciente, EstadoTurno, Configuracion } from '@/lib/types'
-import { formatHora, colorEstadoTurno, labelEstadoTurno, esDiaLaborable } from '@/lib/utils'
+import { TurnoConPaciente, EstadoTurno, Configuracion, LoteHorario } from '@/lib/types'
+import { formatHora, colorEstadoTurno, labelEstadoTurno, esDiaLaborable, timeToMinutes, minutesToTime } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -40,6 +40,7 @@ export default function TurnosPage() {
   const [turnoEditar, setTurnoEditar] = useState<TurnoConPaciente | null>(null)
   const [notasEditar, setNotasEditar] = useState('')
   const [error, setError] = useState('')
+  const [lotes, setLotes] = useState<LoteHorario[]>([])
 
   const cargarConfig = useCallback(async () => {
     const { data } = await supabase.from('configuracion').select('*').single()
@@ -99,6 +100,12 @@ export default function TurnosPage() {
   useEffect(() => { cargarConfig() }, [cargarConfig])
 
   useEffect(() => {
+    const diaSemana = format(parseISO(fechaSeleccionada), 'EEEE', { locale: es }).toLowerCase()
+    supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden')
+      .then(({ data }) => setLotes(data || []))
+  }, []) // only on mount
+
+  useEffect(() => {
     if (vista === 'semana') {
       cargarTurnosSemana(fechaRef)
     } else {
@@ -135,9 +142,12 @@ export default function TurnosPage() {
     }
   }
 
-  function seleccionarDia(fecha: string) {
+  async function seleccionarDia(fecha: string) {
     setFechaSeleccionada(fecha)
     cargarTurnosDia(fecha)
+    const diaSemana = format(parseISO(fecha), 'EEEE', { locale: es }).toLowerCase()
+    const { data } = await supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden')
+    setLotes(data || [])
   }
 
   const TarjetaTurno = ({ turno }: { turno: TurnoConPaciente }) => (
@@ -176,6 +186,54 @@ export default function TurnosPage() {
       </div>
     </div>
   )
+
+  function AgendaDia() {
+    const DURACION = 20
+    const lotesOrdenados = [...lotes].sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio))
+    const slots: Array<{ hora: string; turno: TurnoConPaciente | null }> = []
+
+    for (const lote of lotesOrdenados) {
+      let actual = timeToMinutes(lote.hora_inicio)
+      const fin = timeToMinutes(lote.hora_fin)
+      while (actual + DURACION <= fin) {
+        const horaStr = minutesToTime(actual)
+        const turnoEnSlot = turnos.find(t => t.hora.substring(0, 5) === horaStr && t.estado !== 'cancelado') ?? null
+        slots.push({ hora: horaStr, turno: turnoEnSlot })
+        actual += DURACION
+      }
+    }
+
+    if (slots.length === 0) {
+      return (
+        <Card className="text-center py-8">
+          <p className="text-gray-500">No hay horarios configurados para este día</p>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="flex flex-col gap-2">
+        {slots.map(({ hora, turno }) =>
+          turno ? (
+            <TarjetaTurno key={hora} turno={turno} />
+          ) : (
+            <div key={hora} className="flex items-center gap-3 px-3 py-2.5 bg-green-50 rounded-xl border border-green-100">
+              <div className="w-12 h-10 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
+                <span className="text-xs font-bold text-green-700">{hora}</span>
+              </div>
+              <span className="text-green-700 font-semibold text-sm flex-1">Disponible</span>
+              <button
+                onClick={() => setModalNuevoTurno(true)}
+                className="text-xs text-green-600 font-bold hover:text-green-800 px-2 py-1 rounded-lg hover:bg-green-100"
+              >
+                + Asignar
+              </button>
+            </div>
+          )
+        )}
+      </div>
+    )
+  }
 
   const tituloNav = vista === 'semana'
     ? (() => {
@@ -269,14 +327,8 @@ export default function TurnosPage() {
               <div className="flex justify-center py-8">
                 <div className="animate-spin w-7 h-7 border-4 border-blue-600 border-t-transparent rounded-full" />
               </div>
-            ) : turnosFiltrados(turnos).length === 0 ? (
-              <Card className="text-center py-8">
-                <p className="text-gray-500">No hay turnos para este día</p>
-              </Card>
             ) : (
-              <div className="flex flex-col gap-2">
-                {turnosFiltrados(turnos).map(t => <TarjetaTurno key={t.id} turno={t} />)}
-              </div>
+              <AgendaDia />
             )}
           </div>
         </div>
@@ -321,14 +373,8 @@ export default function TurnosPage() {
               <div className="flex justify-center py-8">
                 <div className="animate-spin w-7 h-7 border-4 border-blue-600 border-t-transparent rounded-full" />
               </div>
-            ) : turnosFiltrados(turnos).length === 0 ? (
-              <Card className="text-center py-8">
-                <p className="text-gray-500">No hay turnos para este día</p>
-              </Card>
             ) : (
-              <div className="flex flex-col gap-2">
-                {turnosFiltrados(turnos).map(t => <TarjetaTurno key={t.id} turno={t} />)}
-              </div>
+              <AgendaDia />
             )}
           </div>
         </div>
