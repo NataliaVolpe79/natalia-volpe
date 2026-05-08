@@ -125,7 +125,8 @@ export default function HomePage() {
       </main>
 
       <footer className="text-center py-6 text-sm text-gray-400">
-        <p>{NOMBRE_DOCTORA} · Médica Psiquiatra</p>
+        <p>{NOMBRE_DOCTORA}</p>
+        <p>Médica Psiquiatra · Buenos Aires</p>
       </footer>
     </div>
   )
