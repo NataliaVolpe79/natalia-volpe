@@ -3,10 +3,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { format, parseISO, addDays, addWeeks, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, getDay, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, Clock, Check, X, Edit2, Video, MapPin, Calendar, LayoutList } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Clock, Check, X, Edit2, Video, MapPin, Calendar, LayoutList, MessageCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { TurnoConPaciente, EstadoTurno, Configuracion, LoteHorario } from '@/lib/types'
-import { formatHora, colorEstadoTurno, labelEstadoTurno, esDiaLaborable, timeToMinutes, minutesToTime } from '@/lib/utils'
+import { formatHora, formatFecha, colorEstadoTurno, labelEstadoTurno, esDiaLaborable, timeToMinutes, minutesToTime, linkWhatsApp } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -41,6 +41,9 @@ export default function TurnosPage() {
   const [notasEditar, setNotasEditar] = useState('')
   const [error, setError] = useState('')
   const [lotes, setLotes] = useState<LoteHorario[]>([])
+  const [modalCancelar, setModalCancelar] = useState<{ modo: 'uno'; turno: TurnoConPaciente } | { modo: 'dia' } | null>(null)
+  const [mensajeCancelar, setMensajeCancelar] = useState('')
+  const [linksWA, setLinksWA] = useState<{ nombre: string; url: string }[]>([])
 
   const cargarConfig = useCallback(async () => {
     const { data } = await supabase.from('configuracion').select('*').single()
@@ -114,6 +117,48 @@ export default function TurnosPage() {
     }
   }, [vista, fechaRef, fechaSeleccionada, cargarTurnosSemana, cargarDiasConTurnosMes, cargarTurnosDia])
 
+  function iniciarCancelTurno(turno: TurnoConPaciente) {
+    const nombre = `${turno.paciente?.nombre} ${turno.paciente?.apellido}`
+    const fecha = formatFecha(turno.fecha)
+    const hora = formatHora(turno.hora)
+    setLinksWA([])
+    setMensajeCancelar(`Hola ${nombre}! Tu turno del ${fecha} a las ${hora}hs fue cancelado. Disculpá los inconvenientes. Podés comunicarte con nosotros para reprogramarlo.`)
+    setModalCancelar({ modo: 'uno', turno })
+  }
+
+  function iniciarCancelDia() {
+    const activos = turnos.filter(t => t.estado !== 'cancelado' && t.estado !== 'completado')
+    if (activos.length === 0) return
+    const fecha = formatFecha(fechaSeleccionada)
+    setLinksWA([])
+    setMensajeCancelar(`Hola {nombre}! Tu turno del ${fecha} fue cancelado. Disculpá los inconvenientes. Podés comunicarte con nosotros para reprogramarlo.`)
+    setModalCancelar({ modo: 'dia' })
+  }
+
+  async function confirmarCancelacion() {
+    if (!modalCancelar) return
+    const turnosACancelar = modalCancelar.modo === 'uno'
+      ? [modalCancelar.turno]
+      : turnos.filter(t => t.estado !== 'cancelado' && t.estado !== 'completado')
+
+    for (const t of turnosACancelar) {
+      await supabase.from('turnos').update({ estado: 'cancelado' }).eq('id', t.id)
+    }
+
+    const links = turnosACancelar
+      .filter(t => t.paciente?.telefono)
+      .map(t => {
+        const nombre = `${t.paciente!.nombre} ${t.paciente!.apellido}`
+        const msg = mensajeCancelar.replace('{nombre}', nombre)
+        return { nombre, url: linkWhatsApp(t.paciente!.telefono!, msg) }
+      })
+
+    setLinksWA(links)
+    cargarTurnosDia(fechaSeleccionada)
+    if (vista === 'semana') cargarTurnosSemana(fechaRef)
+    else cargarDiasConTurnosMes(fechaRef)
+  }
+
   async function cambiarEstado(id: string, estado: EstadoTurno) {
     const { error: e } = await supabase.from('turnos').update({ estado }).eq('id', id)
     if (e) setError('No se pudo actualizar el estado')
@@ -177,7 +222,7 @@ export default function TurnosPage() {
               className="flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200">
               <Edit2 className="w-3.5 h-3.5" /> Notas
             </button>
-            <button onClick={() => cambiarEstado(turno.id, 'cancelado')}
+            <button onClick={() => iniciarCancelTurno(turno)}
               className="flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100">
               <X className="w-3.5 h-3.5" /> Cancelar
             </button>
@@ -320,9 +365,17 @@ export default function TurnosPage() {
 
           {/* Turnos del día seleccionado */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-3 capitalize">
-              {format(parseISO(fechaSeleccionada), "EEEE d 'de' MMMM", { locale: es })}
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-gray-900 capitalize">
+                {format(parseISO(fechaSeleccionada), "EEEE d 'de' MMMM", { locale: es })}
+              </h2>
+              {turnos.some(t => t.estado !== 'cancelado' && t.estado !== 'completado') && (
+                <button onClick={iniciarCancelDia}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-100">
+                  <X className="w-3.5 h-3.5" /> Cancelar todos
+                </button>
+              )}
+            </div>
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin w-7 h-7 border-4 border-blue-600 border-t-transparent rounded-full" />
@@ -366,9 +419,17 @@ export default function TurnosPage() {
 
           {/* Turnos del día seleccionado */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-3 capitalize">
-              {format(parseISO(fechaSeleccionada), "EEEE d 'de' MMMM", { locale: es })}
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-gray-900 capitalize">
+                {format(parseISO(fechaSeleccionada), "EEEE d 'de' MMMM", { locale: es })}
+              </h2>
+              {turnos.some(t => t.estado !== 'cancelado' && t.estado !== 'completado') && (
+                <button onClick={iniciarCancelDia}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-100">
+                  <X className="w-3.5 h-3.5" /> Cancelar todos
+                </button>
+              )}
+            </div>
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin w-7 h-7 border-4 border-blue-600 border-t-transparent rounded-full" />
@@ -395,6 +456,51 @@ export default function TurnosPage() {
           fechaInicial={fechaSeleccionada}
         />
       )}
+
+      <Modal
+        isOpen={!!modalCancelar}
+        onClose={() => { setModalCancelar(null); setLinksWA([]) }}
+        title={modalCancelar?.modo === 'dia' ? 'Cancelar todos los turnos del día' : 'Cancelar turno'}
+      >
+        {linksWA.length === 0 ? (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-gray-600">
+              {modalCancelar?.modo === 'dia'
+                ? `Se cancelarán ${turnos.filter(t => t.estado !== 'cancelado' && t.estado !== 'completado').length} turno(s). Editá el mensaje antes de enviar.`
+                : 'Editá el mensaje antes de enviar al paciente.'}
+            </p>
+            {modalCancelar?.modo === 'dia' && (
+              <p className="text-xs text-gray-400">Usá <span className="font-mono bg-gray-100 px-1 rounded">{'{nombre}'}</span> para insertar el nombre de cada paciente.</p>
+            )}
+            <Textarea
+              label="Mensaje de cancelación"
+              value={mensajeCancelar}
+              onChange={e => setMensajeCancelar(e.target.value)}
+              rows={4}
+            />
+            <div className="flex gap-3">
+              <Button variant="secondary" fullWidth onClick={() => setModalCancelar(null)}>Volver</Button>
+              <Button fullWidth onClick={confirmarCancelacion}>Confirmar cancelación</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-green-700 font-semibold">
+              ✓ Turno(s) cancelado(s). Enviá el mensaje a cada paciente:
+            </p>
+            <div className="flex flex-col gap-2">
+              {linksWA.map(({ nombre, url }) => (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-3 bg-green-50 text-green-800 rounded-xl font-semibold text-sm hover:bg-green-100 transition-colors">
+                  <MessageCircle className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 truncate">Enviar a {nombre}</span>
+                </a>
+              ))}
+            </div>
+            <Button fullWidth onClick={() => { setModalCancelar(null); setLinksWA([]) }}>Listo</Button>
+          </div>
+        )}
+      </Modal>
 
       <Modal isOpen={!!turnoEditar} onClose={() => setTurnoEditar(null)} title="Editar notas del turno">
         <div className="flex flex-col gap-4">
