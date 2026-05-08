@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Alert from '@/components/ui/Alert'
 import { supabase } from '@/lib/supabase'
-import { calcularHorariosEnLotes, esDiaLaborable, getModalidadPorFecha, formatFecha } from '@/lib/utils'
+import { calcularHorariosEnLotes, esDiaLaborable, formatFecha } from '@/lib/utils'
 import { Configuracion } from '@/lib/types'
 
 const LS_KEY = 'nv_paciente_tel'
