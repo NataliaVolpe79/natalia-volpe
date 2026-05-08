@@ -490,7 +490,7 @@ export default function SacarTurnoPage() {
               </div>
 
               <a
-                href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola! Soy ${nombreCompleto} y me acabo de registrar. Quisiera coordinar mi primera consulta. Mi WhatsApp: ${telefono}`)}`}
+                href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola! Soy ${nombreCompleto} y me acabo de registrar. Quisiera coordinar mi primera consulta.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full"
