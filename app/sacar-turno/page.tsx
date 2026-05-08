@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CheckCircle, ArrowLeft, Phone } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle, ArrowLeft, Phone, MessageCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Alert from '@/components/ui/Alert'
@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { calcularHorariosEnLotes, getModalidadPorFecha, esDiaLaborable, formatHora } from '@/lib/utils'
 import { Configuracion } from '@/lib/types'
 
+const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_CONTACTO || '549XXXXXXXXXX'
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 const DURACION = 20
 
@@ -116,7 +117,7 @@ export default function SacarTurnoPage() {
         .single()
       if (err || !data) throw new Error('No se pudo crear tu cuenta')
       setPaciente(data)
-      setPaso(2)
+      setPaso(4) // redirige a WhatsApp, no al calendario
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Hubo un error. Intentá de nuevo.')
     } finally {
@@ -452,9 +453,59 @@ export default function SacarTurnoPage() {
             </motion.div>
           )}
 
-          {/* ======= PASO 4: Confirmación ======= */}
-          {paso === 4 && (
-            <motion.div key="paso4"
+          {/* ======= PASO 4a: WhatsApp — paciente nuevo ======= */}
+          {paso === 4 && esPrimeraTurno && (
+            <motion.div key="paso4a"
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center text-center gap-8 py-8"
+            >
+              <motion.div
+                initial={{ scale: 0 }} animate={{ scale: 1 }}
+                transition={{ type: 'spring', delay: 0.15, stiffness: 200 }}
+                className="w-28 h-28 bg-green-100 rounded-full flex items-center justify-center"
+              >
+                <MessageCircle className="w-16 h-16 text-green-600" />
+              </motion.div>
+
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-3">¡Registrado!</h1>
+                <p className="text-gray-500 text-lg">
+                  Escribile a la Dra. Volpe por WhatsApp para coordinar el día y horario de tu primera consulta.
+                </p>
+              </div>
+
+              <div className="w-full bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-left flex flex-col gap-3">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-gray-500">Nombre</span>
+                  <span className="font-bold text-gray-900">{nombreCompleto}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-gray-500">WhatsApp</span>
+                  <span className="font-bold text-gray-900">{telefono}</span>
+                </div>
+              </div>
+
+              <a
+                href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola! Soy ${nombreCompleto} y me acabo de registrar. Quisiera coordinar mi primera consulta. Mi WhatsApp: ${telefono}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <Button size="lg" fullWidth variant="success">
+                  <MessageCircle className="w-6 h-6" />
+                  Escribir a la Dra. por WhatsApp
+                </Button>
+              </a>
+
+              <Button size="lg" fullWidth variant="secondary" onClick={() => router.push('/')}>
+                Volver al inicio
+              </Button>
+            </motion.div>
+          )}
+
+          {/* ======= PASO 4b: Confirmación — paciente existente ======= */}
+          {paso === 4 && !esPrimeraTurno && (
+            <motion.div key="paso4b"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center text-center gap-8 py-8"
             >
