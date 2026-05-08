@@ -97,6 +97,7 @@ export default function SacarTurnoPage() {
     if (!apellido.trim()) e.apellido = 'Ingresá tu apellido'
     if (!dni.trim()) e.dni = 'Ingresá tu DNI'
     else if (!/^\d{7,8}$/.test(dni.replace(/\D/g, ''))) e.dni = 'DNI inválido (7 u 8 dígitos)'
+    if (!credencial.trim()) e.credencial = 'Ingresá tu número de credencial OSDE'
     setErrores(e)
     if (Object.keys(e).length > 0) return
 
@@ -111,7 +112,8 @@ export default function SacarTurnoPage() {
           apellido: apellido.trim(),
           telefono: tel,
           dni: dni.replace(/\D/g, ''),
-          numero_afiliado: credencial.trim() || null,
+          obra_social: 'OSDE',
+          numero_afiliado: credencial.trim(),
         })
         .select('id, nombre, apellido')
         .single()
@@ -340,10 +342,12 @@ export default function SacarTurnoPage() {
                   type="tel" inputMode="numeric"
                   value={dni} error={errores.dni}
                   onChange={e => { setDni(e.target.value); setErrores(p => ({ ...p, dni: '' })) }} />
-                <Input label="Número de credencial (obra social)" placeholder="Ej: 123456789"
-                  hint="Opcional"
-                  value={credencial}
-                  onChange={e => setCredencial(e.target.value)} />
+                <div className="bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-3 text-sm text-cyan-800 font-semibold">
+                  🏥 Obra social: OSDE
+                </div>
+                <Input label="Número de credencial OSDE" placeholder="Ej: 123456789"
+                  value={credencial} error={errores.credencial}
+                  onChange={e => { setCredencial(e.target.value); setErrores(p => ({ ...p, credencial: '' })) }} />
               </div>
 
               <Button size="lg" fullWidth onClick={registrarYContinuar} loading={loading}>
