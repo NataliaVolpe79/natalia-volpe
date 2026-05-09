@@ -37,6 +37,7 @@ export default function SacarTurnoPage() {
   const [apellido, setApellido] = useState('')
   const [dni, setDni] = useState('')
   const [credencial, setCredencial] = useState('')
+  const [obraSocial, setObraSocial] = useState<'OSDE' | 'Particular'>('OSDE')
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [esPrimeraTurno, setEsPrimeraTurno] = useState(false)
@@ -97,7 +98,7 @@ export default function SacarTurnoPage() {
     if (!apellido.trim()) e.apellido = 'Ingresá tu apellido'
     if (!dni.trim()) e.dni = 'Ingresá tu DNI'
     else if (!/^\d{7,8}$/.test(dni.replace(/\D/g, ''))) e.dni = 'DNI inválido (7 u 8 dígitos)'
-    if (!credencial.trim()) e.credencial = 'Ingresá tu número de credencial OSDE'
+    if (obraSocial === 'OSDE' && !credencial.trim()) e.credencial = 'Ingresá tu número de credencial OSDE'
     setErrores(e)
     if (Object.keys(e).length > 0) return
 
@@ -112,8 +113,8 @@ export default function SacarTurnoPage() {
           apellido: apellido.trim(),
           telefono: tel,
           dni: dni.replace(/\D/g, ''),
-          obra_social: 'OSDE',
-          numero_afiliado: credencial.trim(),
+          obra_social: obraSocial,
+          numero_afiliado: obraSocial === 'OSDE' ? credencial.trim() : null,
         })
         .select('id, nombre, apellido')
         .single()
@@ -363,12 +364,34 @@ export default function SacarTurnoPage() {
                   type="tel" inputMode="numeric"
                   value={dni} error={errores.dni}
                   onChange={e => { setDni(e.target.value); setErrores(p => ({ ...p, dni: '' })) }} />
-                <div className="bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-3 text-sm text-cyan-800 font-semibold">
-                  🏥 Obra social: OSDE
+
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Cobertura médica</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button"
+                      onClick={() => { setObraSocial('OSDE'); setErrores(p => ({ ...p, credencial: '' })) }}
+                      className={`py-3 rounded-xl border-2 font-semibold text-sm transition-all ${obraSocial === 'OSDE' ? 'border-cyan-500 bg-cyan-50 text-cyan-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
+                      🏥 OSDE
+                    </button>
+                    <button type="button"
+                      onClick={() => { setObraSocial('Particular'); setCredencial(''); setErrores(p => ({ ...p, credencial: '' })) }}
+                      className={`py-3 rounded-xl border-2 font-semibold text-sm transition-all ${obraSocial === 'Particular' ? 'border-purple-500 bg-purple-50 text-purple-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
+                      💳 Particular
+                    </button>
+                  </div>
                 </div>
-                <Input label="Número de credencial OSDE" placeholder="Ej: 123456789"
-                  value={credencial} error={errores.credencial}
-                  onChange={e => { setCredencial(e.target.value); setErrores(p => ({ ...p, credencial: '' })) }} />
+
+                {obraSocial === 'OSDE' && (
+                  <Input label="Número de credencial OSDE" placeholder="Ej: 123456789"
+                    value={credencial} error={errores.credencial}
+                    onChange={e => { setCredencial(e.target.value); setErrores(p => ({ ...p, credencial: '' })) }} />
+                )}
+
+                {obraSocial === 'Particular' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-sm text-purple-800">
+                    💳 Consulta particular: <strong>$65.000</strong>
+                  </div>
+                )}
               </div>
 
               <Button size="lg" fullWidth onClick={registrarYContinuar} loading={loading}>
@@ -499,10 +522,16 @@ export default function SacarTurnoPage() {
                   <span className="text-gray-500">Nombre</span>
                   <span className="font-bold text-gray-900">{nombreCompleto}</span>
                 </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-gray-500">WhatsApp</span>
-                  <span className="font-bold text-gray-900">{telefono}</span>
+                <div className={`flex justify-between items-center py-2 ${obraSocial === 'Particular' ? 'border-b border-gray-100' : ''}`}>
+                  <span className="text-gray-500">Cobertura</span>
+                  <span className="font-bold text-gray-900">{obraSocial}</span>
                 </div>
+                {obraSocial === 'Particular' && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-500">Valor consulta</span>
+                    <span className="font-bold text-purple-700">$65.000</span>
+                  </div>
+                )}
               </div>
 
               <a
