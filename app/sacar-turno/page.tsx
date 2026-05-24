@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay } from 'date-fns'
@@ -16,6 +16,7 @@ import { Configuracion } from '@/lib/types'
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_CONTACTO || '549XXXXXXXXXX'
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 const DURACION = 20
+const STORAGE_KEY = 'nv_sesion'
 
 // paso 0: buscar teléfono
 // paso 1: registrar (solo si no existe)
@@ -50,6 +51,45 @@ export default function SacarTurnoPage() {
   const [modalidad, setModalidad] = useState<'presencial' | 'videollamada'>('videollamada')
   const [mesActual, setMesActual] = useState(new Date())
 
+  // Auto-login desde localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (!saved) return
+      const { telefono: tel, paciente: pac } = JSON.parse(saved)
+      if (!tel || !pac?.id) return
+      setTelefono(tel)
+      setLoading(true)
+      Promise.all([
+        supabase.from('configuracion').select('*').single(),
+        supabase.from('pacientes')
+          .select('id, nombre, apellido, telefono, duracion_seguimiento_minutos')
+          .eq('telefono', tel).order('created_at', { ascending: true }).limit(1).maybeSingle(),
+      ]).then(([cfgRes, pacRes]) => {
+        if (cfgRes.data) setConfig(cfgRes.data)
+        if (pacRes.data) {
+          setPaciente(pacRes.data as Paciente)
+          setEsPrimeraTurno(false)
+          setPaso(2)
+        } else {
+          localStorage.removeItem(STORAGE_KEY)
+        }
+      }).finally(() => setLoading(false))
+    } catch {
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function cerrarSesion() {
+    localStorage.removeItem(STORAGE_KEY)
+    setPaso(0)
+    setPaciente(null)
+    setTelefono('')
+    setFechaSeleccionada('')
+    setHoraSeleccionada('')
+  }
+
   // ----------------------------------------------------------------
   // Paso 0 — buscar teléfono
   // ----------------------------------------------------------------
@@ -76,6 +116,7 @@ export default function SacarTurnoPage() {
       if (pacienteRes.data) {
         setPaciente(pacienteRes.data as Paciente)
         setEsPrimeraTurno(false)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ telefono: tel, paciente: pacienteRes.data }))
         setPaso(2)
       } else {
         setEsPrimeraTurno(true)
@@ -118,7 +159,9 @@ export default function SacarTurnoPage() {
           numero_afiliado: obraSocial === 'OSDE' ? credencial.trim() : null,
         })
       if (err) throw new Error(`Error: ${err.message} (${err.code})`)
-      setPaciente({ id: newId, nombre: nombre.trim(), apellido: apellido.trim() })
+      const nuevoPaciente = { id: newId, nombre: nombre.trim(), apellido: apellido.trim() }
+      setPaciente(nuevoPaciente)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ telefono: tel, paciente: nuevoPaciente }))
       setPaso(4) // redirige a WhatsApp, no al calendario
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Hubo un error. Intentá de nuevo.')
@@ -407,11 +450,16 @@ export default function SacarTurnoPage() {
             >
               <div>
                 {paciente && (
-                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4">
-                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
-                    <span className="text-green-800 font-semibold">
-                      Hola, {paciente.nombre} {paciente.apellido}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                      <span className="text-green-800 font-semibold">
+                        Hola, {paciente.nombre} {paciente.apellido}
+                      </span>
+                    </div>
+                    <button onClick={cerrarSesion} className="text-xs text-gray-400 hover:text-gray-600 underline shrink-0">
+                      No soy yo
+                    </button>
                   </div>
                 )}
                 <h1 className="text-2xl font-bold text-gray-900 mb-1">Elegí el día</h1>
