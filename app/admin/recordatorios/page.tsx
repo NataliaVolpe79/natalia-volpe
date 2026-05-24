@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { format, parseISO, differenceInHours } from 'date-fns'
+import { format, parseISO, differenceInHours, addDays, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Bell, CheckCircle, Phone, Clock, Info } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -20,14 +20,15 @@ export default function RecordatoriosPage() {
     setLoading(true)
     try {
       const ahora = new Date()
-      const en26h = new Date(ahora.getTime() + 26 * 60 * 60 * 1000)
+      const hoy = format(ahora, 'yyyy-MM-dd')
+      const manana = format(addDays(startOfDay(ahora), 1), 'yyyy-MM-dd')
 
       const { data } = await supabase
         .from('turnos')
         .select('*, paciente:pacientes(*)')
         .in('estado', ['pendiente', 'confirmado'])
-        .gte('fecha', format(ahora, 'yyyy-MM-dd'))
-        .lte('fecha', format(en26h, 'yyyy-MM-dd'))
+        .gte('fecha', hoy)
+        .lte('fecha', manana)
         .order('fecha')
         .order('hora')
 
@@ -38,10 +39,12 @@ export default function RecordatoriosPage() {
         const fechaHoraTurno = new Date(`${turno.fecha}T${turno.hora}`)
         const horasRestantes = differenceInHours(fechaHoraTurno, ahora)
 
-        if (horasRestantes >= 23 && horasRestantes <= 26 && !turno.recordatorio_24h_enviado) {
+        // 24h: todos los turnos de mañana que no fueron recordados
+        if (turno.fecha === manana && !turno.recordatorio_24h_enviado) {
           pendientes.push({ turno, tipo: '24h' })
         }
-        if (horasRestantes >= 0.5 && horasRestantes <= 2 && !turno.recordatorio_1h_enviado) {
+        // 1h: turnos de hoy en las próximas 2 horas que no fueron recordados
+        if (turno.fecha === hoy && horasRestantes >= 0 && horasRestantes <= 2 && !turno.recordatorio_1h_enviado) {
           pendientes.push({ turno, tipo: '1h' })
         }
       }
