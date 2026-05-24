@@ -48,6 +48,7 @@ export default function TurnosPage() {
   const [modalCancelar, setModalCancelar] = useState<{ modo: 'uno'; turno: TurnoConPaciente } | { modo: 'dia' } | null>(null)
   const [mensajeCancelar, setMensajeCancelar] = useState('')
   const [linksWA, setLinksWA] = useState<{ nombre: string; url: string }[]>([])
+  const [turnoAcciones, setTurnoAcciones] = useState<TurnoConPaciente | null>(null)
 
   const cargarConfig = useCallback(async () => {
     const { data } = await supabase.from('configuracion').select('*').single()
@@ -281,14 +282,20 @@ export default function TurnosPage() {
                 turno ? (
                   <div
                     key={hora}
-                    className="px-2 py-2 bg-blue-100 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-200 transition-colors"
-                    onClick={() => seleccionarDia(fechaStr)}
+                    className={`px-2 py-2 rounded-lg cursor-pointer transition-colors border ${
+                      turno.estado === 'completado'
+                        ? 'bg-green-50 border-green-200 hover:bg-green-100'
+                        : turno.estado === 'cancelado'
+                        ? 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                        : 'bg-blue-100 border-blue-200 hover:bg-blue-200'
+                    }`}
+                    onClick={() => setTurnoAcciones(turno)}
                   >
-                    <p className="text-xs font-bold text-blue-700 leading-none">{hora}</p>
-                    <p className="text-xs text-blue-900 font-semibold truncate mt-0.5 leading-tight">
+                    <p className={`text-xs font-bold leading-none ${turno.estado === 'completado' ? 'text-green-700' : turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-700'}`}>{hora}</p>
+                    <p className={`text-xs font-semibold truncate mt-0.5 leading-tight ${turno.estado === 'cancelado' ? 'text-gray-400 line-through' : 'text-blue-900'}`}>
                       {turno.paciente?.nombre} {turno.paciente?.apellido}
                     </p>
-                    <p className="text-[10px] text-blue-600 mt-0.5">{turno.duracion_minutos}min</p>
+                    <p className={`text-[10px] mt-0.5 ${turno.estado === 'completado' ? 'text-green-600' : turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-600'}`}>{turno.duracion_minutos}min</p>
                   </div>
                 ) : esContinuacion ? (
                   <div
@@ -599,6 +606,78 @@ export default function TurnosPage() {
               ))}
             </div>
             <Button fullWidth onClick={() => { setModalCancelar(null); setLinksWA([]) }}>Listo</Button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal acciones rápidas — click en turno de grilla semanal */}
+      <Modal
+        isOpen={!!turnoAcciones}
+        onClose={() => setTurnoAcciones(null)}
+        title="Turno"
+      >
+        {turnoAcciones && (
+          <div className="flex flex-col gap-4">
+            <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-2 text-sm">
+              <p className="font-bold text-gray-900 text-lg">
+                {turnoAcciones.paciente?.nombre} {turnoAcciones.paciente?.apellido}
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-600">
+                <span>📅 {formatFecha(turnoAcciones.fecha)}</span>
+                <span>🕐 {formatHora(turnoAcciones.hora)} hs</span>
+                <span>{turnoAcciones.modalidad === 'presencial' ? '📍 Presencial' : '💻 Videollamada'}</span>
+                <span>{turnoAcciones.duracion_minutos} min</span>
+              </div>
+              <Badge className={colorEstadoTurno[turnoAcciones.estado]}>{labelEstadoTurno[turnoAcciones.estado]}</Badge>
+            </div>
+
+            {turnoAcciones.estado !== 'cancelado' && turnoAcciones.estado !== 'completado' && (
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={async () => {
+                    await cambiarEstado(turnoAcciones.id, 'confirmado')
+                    cargarTurnosSemana(fechaRef)
+                    setTurnoAcciones(null)
+                  }}
+                  disabled={turnoAcciones.estado === 'confirmado'}
+                  className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-semibold text-sm hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Check className="w-4 h-4" /> Marcar como confirmado
+                </button>
+                <button
+                  onClick={async () => {
+                    await cambiarEstado(turnoAcciones.id, 'completado')
+                    cargarTurnosSemana(fechaRef)
+                    setTurnoAcciones(null)
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 bg-green-50 text-green-700 rounded-xl font-semibold text-sm hover:bg-green-100 transition-colors"
+                >
+                  <Check className="w-4 h-4" /> Marcar como completado
+                </button>
+                <button
+                  onClick={() => {
+                    setTurnoAcciones(null)
+                    iniciarCancelTurno(turnoAcciones)
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-600 rounded-xl font-semibold text-sm hover:bg-red-100 transition-colors"
+                >
+                  <X className="w-4 h-4" /> Cancelar turno
+                </button>
+              </div>
+            )}
+
+            {turnoAcciones.paciente?.telefono && (
+              <a
+                href={linkWhatsApp(turnoAcciones.paciente.telefono)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-3 bg-green-50 text-green-800 rounded-xl font-semibold text-sm hover:bg-green-100 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" /> Escribir por WhatsApp
+              </a>
+            )}
+
+            <Button variant="secondary" onClick={() => setTurnoAcciones(null)}>Cerrar</Button>
           </div>
         )}
       </Modal>
