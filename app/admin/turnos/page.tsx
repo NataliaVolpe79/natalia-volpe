@@ -221,19 +221,23 @@ export default function TurnosPage() {
       const esPresencial = config ? getModalidadPorFecha(fechaStr, config) === 'presencial' : false
       const esHoy = fechaStr === hoyStr
 
-      const slots: { hora: string; turno: TurnoConPaciente | null }[] = []
+      const slots: { hora: string; turno: TurnoConPaciente | null; esContinuacion: boolean }[] = []
       for (const lote of lotesDelDia) {
         let actual = timeToMinutes(lote.hora_inicio)
         const fin = timeToMinutes(lote.hora_fin)
         while (actual + DURACION_SLOT <= fin) {
           const horaStr = minutesToTime(actual)
           const turno = turnosDelDia.find(t => t.hora.substring(0, 5) === horaStr) ?? null
-          slots.push({ hora: horaStr, turno })
+          const esContinuacion = !turno && turnosDelDia.some(t => {
+            const tStart = timeToMinutes(t.hora.substring(0, 5))
+            return tStart < actual && actual < tStart + t.duracion_minutos
+          })
+          slots.push({ hora: horaStr, turno, esContinuacion })
           actual += DURACION_SLOT
         }
       }
 
-      const libres = slots.filter(s => !s.turno).length
+      const libres = slots.filter(s => !s.turno && !s.esContinuacion).length
 
       return { dia, fechaStr, esPresencial, esHoy, slots, libres }
     })
@@ -273,7 +277,7 @@ export default function TurnosPage() {
               {slots.length === 0 && (
                 <div className="text-center text-xs text-gray-400 py-4">Sin horarios</div>
               )}
-              {slots.map(({ hora, turno }) =>
+              {slots.map(({ hora, turno, esContinuacion }) =>
                 turno ? (
                   <div
                     key={hora}
@@ -282,9 +286,17 @@ export default function TurnosPage() {
                   >
                     <p className="text-xs font-bold text-blue-700 leading-none">{hora}</p>
                     <p className="text-xs text-blue-900 font-semibold truncate mt-0.5 leading-tight">
-                      {turno.paciente?.nombre} {turno.paciente?.apellido?.charAt(0)}.
+                      {turno.paciente?.nombre} {turno.paciente?.apellido}
                     </p>
                     <p className="text-[10px] text-blue-600 mt-0.5">{turno.duracion_minutos}min</p>
+                  </div>
+                ) : esContinuacion ? (
+                  <div
+                    key={hora}
+                    className="px-2 py-2 bg-gray-100 border border-gray-200 rounded-lg"
+                  >
+                    <p className="text-xs font-bold text-gray-400 leading-none">{hora}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">ocupado</p>
                   </div>
                 ) : (
                   <button
@@ -349,15 +361,20 @@ export default function TurnosPage() {
   function AgendaDia() {
     const DURACION = 20
     const lotesOrdenados = [...lotes].sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio))
-    const slots: Array<{ hora: string; turno: TurnoConPaciente | null }> = []
+    const slots: Array<{ hora: string; turno: TurnoConPaciente | null; esContinuacion: boolean }> = []
 
     for (const lote of lotesOrdenados) {
       let actual = timeToMinutes(lote.hora_inicio)
       const fin = timeToMinutes(lote.hora_fin)
       while (actual + DURACION <= fin) {
         const horaStr = minutesToTime(actual)
-        const turnoEnSlot = turnosFiltrados(turnos).find(t => t.hora.substring(0, 5) === horaStr && t.estado !== 'cancelado') ?? null
-        slots.push({ hora: horaStr, turno: turnoEnSlot })
+        const activos = turnosFiltrados(turnos).filter(t => t.estado !== 'cancelado')
+        const turnoEnSlot = activos.find(t => t.hora.substring(0, 5) === horaStr) ?? null
+        const esContinuacion = !turnoEnSlot && activos.some(t => {
+          const tStart = timeToMinutes(t.hora.substring(0, 5))
+          return tStart < actual && actual < tStart + t.duracion_minutos
+        })
+        slots.push({ hora: horaStr, turno: turnoEnSlot, esContinuacion })
         actual += DURACION
       }
     }
@@ -372,9 +389,16 @@ export default function TurnosPage() {
 
     return (
       <div className="flex flex-col gap-2">
-        {slots.map(({ hora, turno }) =>
+        {slots.map(({ hora, turno, esContinuacion }) =>
           turno ? (
             <TarjetaTurno key={hora} turno={turno} />
+          ) : esContinuacion ? (
+            <div key={hora} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="w-12 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                <span className="text-xs font-bold text-gray-400">{hora}</span>
+              </div>
+              <span className="text-gray-400 text-sm">Ocupado</span>
+            </div>
           ) : (
             <div key={hora} className="flex items-center gap-3 px-3 py-2.5 bg-green-50 rounded-xl border border-green-100">
               <div className="w-12 h-10 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
@@ -529,7 +553,7 @@ export default function TurnosPage() {
             if (vista === 'mes') cargarDiasConTurnosMes(fechaRef)
           }}
           config={config}
-          fechaInicial={fechaSeleccionada}
+          fechaInicial={horaSlot ? fechaSeleccionada : undefined}
           horaInicial={horaSlot}
         />
       )}
