@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { format, parseISO, isToday, differenceInHours, addDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay } from 'date-fns'
+import { format, parseISO, isToday, differenceInCalendarDays, addDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Phone, Calendar, Clock, Video, MapPin, ArrowLeft, X, CheckCircle, ChevronLeft, ChevronRight, Edit2, MessageCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -350,8 +350,7 @@ export default function MisTurnosPage() {
                   {turnos.map(turno => {
                     const fecha = parseISO(turno.fecha)
                     const esHoy = isToday(fecha)
-                    const horasRestantes = differenceInHours(new Date(`${turno.fecha}T${turno.hora}`), new Date())
-                    const puedeModificar = horasRestantes > 24
+                    const puedeModificar = differenceInCalendarDays(fecha, new Date()) >= 2
                     return (
                       <motion.div
                         key={turno.id}
