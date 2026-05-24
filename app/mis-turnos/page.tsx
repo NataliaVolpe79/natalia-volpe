@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { calcularHorariosEnLotes, esDiaLaborable, formatFecha } from '@/lib/utils'
 import { Configuracion } from '@/lib/types'
 
-const LS_KEY = 'nv_paciente_tel'
+const STORAGE_KEY = 'nv_sesion'
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_CONTACTO || '549XXXXXXXXXX'
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 const DURACION = 20
@@ -36,6 +36,7 @@ export default function MisTurnosPage() {
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [nombrePaciente, setNombrePaciente] = useState('')
   const [encontrado, setEncontrado] = useState(false)
+  const [pacienteId, setPacienteId] = useState('')
   const [cancelando, setCancelando] = useState<string | null>(null)
   const [canceladoWA, setCanceladoWA] = useState<string | null>(null)
 
@@ -50,46 +51,63 @@ export default function MisTurnosPage() {
   const [modificadoWA, setModificadoWA] = useState<string | null>(null)
 
   useEffect(() => {
-    const telGuardado = localStorage.getItem(LS_KEY)
-    if (telGuardado) {
-      setTelefono(telGuardado)
-      buscarTurnos(telGuardado)
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (!saved) return
+      const { telefono: tel, paciente: pac } = JSON.parse(saved)
+      if (!tel || !pac?.id) return
+      setTelefono(tel)
+      setNombrePaciente(`${pac.nombre} ${pac.apellido}`)
+      setPacienteId(pac.id)
+      cargarTurnos(pac.id)
+    } catch {
+      localStorage.removeItem(STORAGE_KEY)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function buscarTurnos(tel: string) {
+  async function cargarTurnos(id: string) {
     setLoading(true)
-    setError('')
     try {
-      const res = await fetch('/api/buscar-paciente', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefono: tel }),
-      })
-      const data = await res.json()
-
-      if (!data.encontrado) {
-        setError('No encontramos ese número. Verificá que sea el mismo con el que te registraste.')
-        localStorage.removeItem(LS_KEY)
-        return
-      }
-
-      const paciente = data.paciente
-      setNombrePaciente(`${paciente.nombre} ${paciente.apellido}`)
-
       const hoy = format(new Date(), 'yyyy-MM-dd')
-      const { data: turnosData } = await supabase
+      const { data } = await supabase
         .from('turnos')
         .select('id, fecha, hora, duracion_minutos, modalidad, estado, tipo_turno')
-        .eq('paciente_id', paciente.id)
+        .eq('paciente_id', id)
         .gte('fecha', hoy)
         .in('estado', ['pendiente', 'confirmado'])
         .order('fecha')
         .order('hora')
-
-      setTurnos(turnosData || [])
+      setTurnos(data || [])
       setEncontrado(true)
-      localStorage.setItem(LS_KEY, tel.replace(/\D/g, ''))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function buscarTurnos(tel: string) {
+    const telLimpio = tel.replace(/\D/g, '')
+    if (telLimpio.length < 8) { setError('Ingresá tu teléfono completo (sin el 15)'); return }
+    setLoading(true)
+    setError('')
+    try {
+      const { data: pac } = await supabase
+        .from('pacientes')
+        .select('id, nombre, apellido, telefono')
+        .eq('telefono', telLimpio)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!pac) {
+        setError('No encontramos ese número. Verificá que sea el mismo con el que te registraste.')
+        return
+      }
+
+      setNombrePaciente(`${pac.nombre} ${pac.apellido}`)
+      setPacienteId(pac.id)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ telefono: telLimpio, paciente: pac }))
+      await cargarTurnos(pac.id)
     } catch {
       setError('Error al buscar tus turnos. Intentá de nuevo.')
     } finally {
@@ -164,10 +182,11 @@ export default function MisTurnosPage() {
   }
 
   function cerrarSesion() {
-    localStorage.removeItem(LS_KEY)
+    localStorage.removeItem(STORAGE_KEY)
     setEncontrado(false)
     setTurnos([])
     setNombrePaciente('')
+    setPacienteId('')
     setTelefono('')
   }
 
@@ -236,8 +255,8 @@ export default function MisTurnosPage() {
             {nombrePaciente && <p className="text-sm text-gray-500">{nombrePaciente}</p>}
           </div>
           {encontrado && (
-            <button onClick={cerrarSesion} className="text-sm text-gray-400 hover:text-gray-600 underline">
-              Salir
+            <button onClick={cerrarSesion} className="text-sm text-blue-500 hover:text-blue-700 font-semibold border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors">
+              Cambiar cuenta
             </button>
           )}
         </div>
