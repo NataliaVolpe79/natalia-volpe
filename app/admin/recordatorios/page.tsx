@@ -97,15 +97,14 @@ export default function RecordatoriosPage() {
     const nombre = turno.paciente?.nombre ?? ''
     const esOsde = (turno.paciente?.obra_social ?? '').toLowerCase().includes('osde')
 
-    const alias = config?.alias_pago ?? 'Nat.wert'
+    const alias = config?.alias_pago ?? 'nat.wert'
 
     if (esOsde) {
       const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
-      const dni = config?.dni_credencial ?? '27308144'
       if (tipo === '24h') {
-        return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* antes de la consulta.\nAdemás, enviá tu credencial de OSDE compartida (DNI ${dni}) por este WhatsApp. ¡Hasta mañana!`
+        return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* antes de la consulta.\nEnviá tu credencial de OSDE antes de la consulta. ¡Hasta mañana!`
       }
-      return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).\nCopago OSDE: ${copago} al alias *${alias}*. Recordá enviá la credencial de OSDE (DNI ${dni}). ¡Nos vemos pronto!`
+      return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).\nCopago OSDE: ${copago} al alias *${alias}*. Enviá tu credencial de OSDE antes de la consulta. ¡Nos vemos pronto!`
     }
 
     // Particular

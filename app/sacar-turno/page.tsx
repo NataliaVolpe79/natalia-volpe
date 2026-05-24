@@ -585,10 +585,6 @@ export default function SacarTurnoPage() {
                   <span className="text-gray-500">Hora</span>
                   <span className="font-bold text-gray-900 text-lg">{formatHora(horaSeleccionada)} hs</span>
                 </div>
-                <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                  <span className="text-gray-500">Duración</span>
-                  <span className="font-bold text-gray-900 text-lg">{DURACION} minutos</span>
-                </div>
                 <div className="flex justify-between items-center py-3">
                   <span className="text-gray-500">Modalidad</span>
                   <span className="font-bold text-gray-900 text-lg">
@@ -598,8 +594,7 @@ export default function SacarTurnoPage() {
               </div>
 
               <Alert type="info">
-                Te avisamos por WhatsApp <strong>24 horas antes</strong> y{' '}
-                <strong>1 hora antes</strong> de tu turno.
+                Te recordamos por WhatsApp <strong>24 horas antes</strong> de tu turno.
               </Alert>
 
               <div className="w-full flex flex-col gap-3">
