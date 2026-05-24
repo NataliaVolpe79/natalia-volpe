@@ -115,7 +115,7 @@ export default function SacarTurnoPage() {
           obra_social: obraSocial,
           numero_afiliado: obraSocial === 'OSDE' ? credencial.trim() : null,
         })
-      if (err) throw new Error('No se pudo crear tu cuenta')
+      if (err) throw new Error(`Error al crear paciente: ${err.message} (${err.code})`)
 
       // SELECT via API (service role) porque anon no tiene permiso de lectura en pacientes
       const res = await fetch('/api/buscar-paciente', {
@@ -124,7 +124,7 @@ export default function SacarTurnoPage() {
         body: JSON.stringify({ telefono: tel }),
       })
       const found = await res.json()
-      if (!found.encontrado) throw new Error('No se pudo crear tu cuenta')
+      if (!found.encontrado) throw new Error('Paciente creado pero no encontrado al buscar')
       setPaciente(found.paciente as Paciente)
       setPaso(4) // redirige a WhatsApp, no al calendario
     } catch (err: unknown) {
