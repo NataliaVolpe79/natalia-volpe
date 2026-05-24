@@ -97,7 +97,7 @@ export default function RecordatoriosPage() {
     const nombre = turno.paciente?.nombre ?? ''
     const esOsde = (turno.paciente?.obra_social ?? '').toLowerCase().includes('osde')
 
-    const alias = config?.alias_pago ?? 'Nat.wer'
+    const alias = config?.alias_pago ?? 'Nat.wert'
 
     if (esOsde) {
       const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
