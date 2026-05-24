@@ -106,7 +106,7 @@ export default function TurnosPage() {
     const diaSemana = format(parseISO(fechaSeleccionada), 'EEEE', { locale: es }).toLowerCase()
     supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden')
       .then(({ data }) => setLotes(data || []))
-  }, []) // only on mount
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (vista === 'semana') {
@@ -242,7 +242,7 @@ export default function TurnosPage() {
       const fin = timeToMinutes(lote.hora_fin)
       while (actual + DURACION <= fin) {
         const horaStr = minutesToTime(actual)
-        const turnoEnSlot = turnos.find(t => t.hora.substring(0, 5) === horaStr && t.estado !== 'cancelado') ?? null
+        const turnoEnSlot = turnosFiltrados(turnos).find(t => t.hora.substring(0, 5) === horaStr && t.estado !== 'cancelado') ?? null
         slots.push({ hora: horaStr, turno: turnoEnSlot })
         actual += DURACION
       }
