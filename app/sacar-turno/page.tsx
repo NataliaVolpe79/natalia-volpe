@@ -106,20 +106,26 @@ export default function SacarTurnoPage() {
     setError('')
     try {
       const tel = telefono.replace(/\D/g, '')
-      const { data, error: err } = await supabase
+      const { error: err } = await supabase
         .from('pacientes')
         .insert({
           nombre: nombre.trim(),
           apellido: apellido.trim(),
           telefono: tel,
-          dni: dni.replace(/\D/g, ''),
           obra_social: obraSocial,
           numero_afiliado: obraSocial === 'OSDE' ? credencial.trim() : null,
         })
-        .select('id, nombre, apellido')
-        .single()
-      if (err || !data) throw new Error('No se pudo crear tu cuenta')
-      setPaciente(data)
+      if (err) throw new Error('No se pudo crear tu cuenta')
+
+      // SELECT via API (service role) porque anon no tiene permiso de lectura en pacientes
+      const res = await fetch('/api/buscar-paciente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefono: tel }),
+      })
+      const found = await res.json()
+      if (!found.encontrado) throw new Error('No se pudo crear tu cuenta')
+      setPaciente(found.paciente as Paciente)
       setPaso(4) // redirige a WhatsApp, no al calendario
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Hubo un error. Intentá de nuevo.')
