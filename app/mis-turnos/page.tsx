@@ -36,7 +36,6 @@ export default function MisTurnosPage() {
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [nombrePaciente, setNombrePaciente] = useState('')
   const [encontrado, setEncontrado] = useState(false)
-  const [pacienteId, setPacienteId] = useState('')
   const [cancelando, setCancelando] = useState<string | null>(null)
   const [canceladoWA, setCanceladoWA] = useState<string | null>(null)
 
@@ -58,7 +57,6 @@ export default function MisTurnosPage() {
       if (!tel || !pac?.id) return
       setTelefono(tel)
       setNombrePaciente(`${pac.nombre} ${pac.apellido}`)
-      setPacienteId(pac.id)
       cargarTurnos(pac.id)
     } catch {
       localStorage.removeItem(STORAGE_KEY)
@@ -105,7 +103,6 @@ export default function MisTurnosPage() {
       }
 
       setNombrePaciente(`${pac.nombre} ${pac.apellido}`)
-      setPacienteId(pac.id)
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ telefono: telLimpio, paciente: pac }))
       await cargarTurnos(pac.id)
     } catch {
@@ -186,7 +183,6 @@ export default function MisTurnosPage() {
     setEncontrado(false)
     setTurnos([])
     setNombrePaciente('')
-    setPacienteId('')
     setTelefono('')
   }
 
