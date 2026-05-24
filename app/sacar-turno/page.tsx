@@ -147,6 +147,15 @@ export default function SacarTurnoPage() {
     setError('')
     try {
       const tel = telefono.replace(/\D/g, '')
+
+      const { data: existente } = await supabase
+        .from('pacientes').select('id').eq('telefono', tel).limit(1).maybeSingle()
+      if (existente) {
+        setError('Este número ya está registrado. Volvé al inicio e ingresá tu teléfono.')
+        setPaso(0)
+        return
+      }
+
       const newId = crypto.randomUUID()
       const { error: err } = await supabase
         .from('pacientes')
