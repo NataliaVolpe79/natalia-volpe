@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { format, parseISO, differenceInHours, addDays, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Bell, CheckCircle, Phone, Clock, Info } from 'lucide-react'
+import { Bell, CheckCircle, Phone, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Configuracion, TurnoConPaciente } from '@/lib/types'
 import { formatHora, linkWhatsApp } from '@/lib/utils'
@@ -123,33 +123,6 @@ export default function RecordatoriosPage() {
         <Bell className="w-7 h-7 text-blue-600" />
         <h1 className="text-2xl font-bold text-gray-900">Recordatorios</h1>
       </div>
-
-      {/* Sección Make.com */}
-      <Card className="border-blue-100 bg-blue-50">
-        <div className="flex items-start gap-3">
-          <Info className="w-6 h-6 text-blue-600 mt-0.5 shrink-0" />
-          <div>
-            <h2 className="font-bold text-blue-900 text-lg mb-2">Automatizar con Make.com</h2>
-            <p className="text-blue-800 text-base mb-3">
-              Podés automatizar el envío de recordatorios por WhatsApp usando Make.com.
-              Configurá un escenario que llame al siguiente endpoint cada hora:
-            </p>
-            <code className="block bg-blue-100 text-blue-900 px-4 py-2 rounded-xl text-sm font-mono break-all mb-3">
-              GET /api/recordatorios/pendientes
-            </code>
-            <p className="text-blue-800 text-sm">
-              Enviá el header: <code className="bg-blue-100 px-1 rounded">x-api-key: TU_RECORDATORIOS_API_KEY</code>
-            </p>
-            <p className="text-blue-800 text-sm mt-2">
-              La respuesta incluye nombre, teléfono, fecha, hora y modalidad de cada turno a recordar.
-              Después marcá cada uno como enviado con:
-            </p>
-            <code className="block bg-blue-100 text-blue-900 px-4 py-2 rounded-xl text-sm font-mono break-all mt-2">
-              PATCH /api/recordatorios/&#123;id&#125;/enviado
-            </code>
-          </div>
-        </div>
-      </Card>
 
       {/* Recordatorios pendientes */}
       <div>
