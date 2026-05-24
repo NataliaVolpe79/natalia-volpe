@@ -66,15 +66,13 @@ export default function SacarTurnoPage() {
         supabase.from('pacientes')
           .select('id, nombre, apellido, telefono, duracion_seguimiento_minutos')
           .eq('telefono', tel)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle(),
       ])
 
       if (configRes.data) setConfig(configRes.data)
 
-      if (pacienteRes.error) {
-        setError(`Debug lookup: ${pacienteRes.error.message} (${pacienteRes.error.code})`)
-        return
-      }
       if (pacienteRes.data) {
         setPaciente(pacienteRes.data as Paciente)
         setEsPrimeraTurno(false)
