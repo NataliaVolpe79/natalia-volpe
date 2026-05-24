@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus, Clock, Check, X, Edit2, Video, MapPin, Calendar, LayoutList, MessageCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { TurnoConPaciente, EstadoTurno, Configuracion, LoteHorario } from '@/lib/types'
-import { formatHora, formatFecha, colorEstadoTurno, labelEstadoTurno, esDiaLaborable, timeToMinutes, minutesToTime, linkWhatsApp } from '@/lib/utils'
+import { formatHora, formatFecha, colorEstadoTurno, labelEstadoTurno, esDiaLaborable, timeToMinutes, minutesToTime, linkWhatsApp, getModalidadPorFecha } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -26,12 +26,15 @@ const FILTROS: { label: string; value: FiltroEstado }[] = [
   { label: 'Completados', value: 'completado' },
   { label: 'Cancelados', value: 'cancelado' },
 ]
+const DURACION_SLOT = 20
 
 export default function TurnosPage() {
   const [vista, setVista] = useState<Vista>('semana')
   const [fechaRef, setFechaRef] = useState(new Date())
   const [fechaSeleccionada, setFechaSeleccionada] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [turnos, setTurnos] = useState<TurnoConPaciente[]>([])
+  const [turnosSemana, setTurnosSemana] = useState<TurnoConPaciente[]>([])
+  const [lotesAll, setLotesAll] = useState<LoteHorario[]>([])
   const [diasConTurnos, setDiasConTurnos] = useState<Record<string, number>>({})
   const [config, setConfig] = useState<Configuracion | null>(null)
   const [loading, setLoading] = useState(false)
@@ -68,6 +71,7 @@ export default function TurnosPage() {
         .lte('fecha', fin)
         .order('hora')
       const t = (data || []).map(x => ({ ...x, pago: Array.isArray(x.pago) ? x.pago[0] : x.pago })) as TurnoConPaciente[]
+      setTurnosSemana(t)
       const conteo: Record<string, number> = {}
       t.forEach(x => { conteo[x.fecha] = (conteo[x.fecha] || 0) + 1 })
       setDiasConTurnos(prev => ({ ...prev, ...conteo }))
@@ -102,11 +106,11 @@ export default function TurnosPage() {
 
   useEffect(() => { cargarConfig() }, [cargarConfig])
 
+  // Cargar todos los lotes una sola vez
   useEffect(() => {
-    const diaSemana = format(parseISO(fechaSeleccionada), 'EEEE', { locale: es }).toLowerCase()
-    supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden')
-      .then(({ data }) => setLotes(data || []))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    supabase.from('lotes_horarios').select('*').order('dia').order('orden')
+      .then(({ data }) => setLotesAll(data || []))
+  }, [])
 
   useEffect(() => {
     if (vista === 'semana') {
@@ -195,6 +199,114 @@ export default function TurnosPage() {
     setLotes(data || [])
   }
 
+  // ── Grilla semanal ──────────────────────────────────────────────
+  function GrillaSemana() {
+    const hoyStr = format(new Date(), 'yyyy-MM-dd')
+    const diasSemana = diasDeSemana(fechaRef)
+    const diasLaborables = diasSemana.filter(d => {
+      const fechaStr = format(d, 'yyyy-MM-dd')
+      return config ? esDiaLaborable(fechaStr, config) : getDay(d) >= 1 && getDay(d) <= 5
+    })
+
+    const columnas = diasLaborables.map(dia => {
+      const fechaStr = format(dia, 'yyyy-MM-dd')
+      const diaNombre = format(dia, 'EEEE', { locale: es }).toLowerCase()
+      const lotesDelDia = lotesAll
+        .filter(l => l.dia === diaNombre)
+        .sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio))
+      const turnosDelDia = turnosFiltrados(turnosSemana).filter(
+        t => t.fecha === fechaStr && t.estado !== 'cancelado'
+      )
+      const esPresencial = config ? getModalidadPorFecha(fechaStr, config) === 'presencial' : false
+      const esHoy = fechaStr === hoyStr
+
+      const slots: { hora: string; turno: TurnoConPaciente | null }[] = []
+      for (const lote of lotesDelDia) {
+        let actual = timeToMinutes(lote.hora_inicio)
+        const fin = timeToMinutes(lote.hora_fin)
+        while (actual + DURACION_SLOT <= fin) {
+          const horaStr = minutesToTime(actual)
+          const turno = turnosDelDia.find(t => t.hora.substring(0, 5) === horaStr) ?? null
+          slots.push({ hora: horaStr, turno })
+          actual += DURACION_SLOT
+        }
+      }
+
+      const libres = slots.filter(s => !s.turno).length
+
+      return { dia, fechaStr, esPresencial, esHoy, slots, libres }
+    })
+
+    if (columnas.length === 0) {
+      return (
+        <Card className="text-center py-8">
+          <p className="text-gray-500">No hay días laborables esta semana</p>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="overflow-x-auto">
+        <div className="flex gap-2" style={{ minWidth: `${columnas.length * 140}px` }}>
+          {columnas.map(({ dia, fechaStr, esPresencial, esHoy, slots, libres }) => (
+            <div key={fechaStr} className="flex-1 flex flex-col gap-1.5">
+              {/* Encabezado del día */}
+              <div className={`text-center p-2.5 rounded-xl ${
+                esHoy
+                  ? 'bg-blue-600 text-white'
+                  : esPresencial
+                  ? 'bg-green-50 border border-green-200 text-green-900'
+                  : 'bg-blue-50 border border-blue-200 text-blue-900'
+              }`}>
+                <p className="text-xs font-semibold capitalize">
+                  {format(dia, 'EEE', { locale: es })}
+                </p>
+                <p className="text-xl font-bold leading-tight">{format(dia, 'd')}</p>
+                <p className="text-xs mt-0.5">{esPresencial ? '📍' : '💻'}</p>
+                <p className={`text-xs font-semibold mt-1 ${esHoy ? 'text-blue-200' : 'text-gray-500'}`}>
+                  {libres} libre{libres !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              {/* Slots */}
+              {slots.length === 0 && (
+                <div className="text-center text-xs text-gray-400 py-4">Sin horarios</div>
+              )}
+              {slots.map(({ hora, turno }) =>
+                turno ? (
+                  <div
+                    key={hora}
+                    className="px-2 py-2 bg-blue-100 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-200 transition-colors"
+                    onClick={() => seleccionarDia(fechaStr)}
+                  >
+                    <p className="text-xs font-bold text-blue-700 leading-none">{hora}</p>
+                    <p className="text-xs text-blue-900 font-semibold truncate mt-0.5 leading-tight">
+                      {turno.paciente?.nombre} {turno.paciente?.apellido?.charAt(0)}.
+                    </p>
+                    <p className="text-[10px] text-blue-600 mt-0.5">{turno.duracion_minutos}min</p>
+                  </div>
+                ) : (
+                  <button
+                    key={hora}
+                    className="px-2 py-2 bg-green-50 border border-dashed border-green-200 rounded-lg hover:bg-green-100 hover:border-green-400 transition-all text-left group"
+                    onClick={() => {
+                      setFechaSeleccionada(fechaStr)
+                      setModalNuevoTurno(true)
+                    }}
+                  >
+                    <p className="text-xs font-bold text-green-700 leading-none">{hora}</p>
+                    <p className="text-[10px] text-green-500 group-hover:text-green-700 mt-0.5">+ Asignar</p>
+                  </button>
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Tarjeta de turno (vista mes / día) ──────────────────────────
   const TarjetaTurno = ({ turno }: { turno: TurnoConPaciente }) => (
     <div className="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-100 hover:border-blue-200 transition-colors">
       <div className="flex flex-col items-center justify-center w-12 h-12 bg-blue-50 rounded-xl shrink-0">
@@ -301,7 +413,6 @@ export default function TurnosPage() {
 
       {/* Controles */}
       <Card padding="sm">
-        {/* Vista switcher */}
         <div className="flex items-center gap-2 mb-3">
           <button onClick={() => setVista('semana')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${vista === 'semana' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
@@ -339,52 +450,15 @@ export default function TurnosPage() {
         </button>
       </div>
 
-      {/* VISTA SEMANA */}
+      {/* VISTA SEMANA — grilla */}
       {vista === 'semana' && (
-        <div className="flex flex-col gap-4">
-          {/* Días de la semana */}
-          <div className="grid grid-cols-7 gap-1">
-            {diasDeSemana(fechaRef).map(dia => {
-              const fechaStr = format(dia, 'yyyy-MM-dd')
-              const sel = fechaStr === fechaSeleccionada
-              const hoy = isToday(dia)
-              const count = diasConTurnos[fechaStr] || 0
-              const esLaboral = config ? esDiaLaborable(fechaStr, config) : true
-              return (
-                <button key={fechaStr} onClick={() => seleccionarDia(fechaStr)}
-                  className={`flex flex-col items-center py-2 px-1 rounded-xl transition-all ${sel ? 'bg-blue-600 text-white' : hoy ? 'bg-blue-50 text-blue-700' : esLaboral ? 'hover:bg-gray-100 text-gray-700' : 'text-gray-300'}`}>
-                  <span className="text-xs font-semibold">{DIAS_CORTO[getDay(dia)]}</span>
-                  <span className="text-lg font-bold">{format(dia, 'd')}</span>
-                  {count > 0 && (
-                    <span className={`text-xs font-bold mt-0.5 ${sel ? 'text-blue-200' : 'text-blue-600'}`}>{count}</span>
-                  )}
-                </button>
-              )
-            })}
+        loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin w-7 h-7 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
-
-          {/* Turnos del día seleccionado */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-gray-900 capitalize">
-                {format(parseISO(fechaSeleccionada), "EEEE d 'de' MMMM", { locale: es })}
-              </h2>
-              {turnos.some(t => t.estado !== 'cancelado' && t.estado !== 'completado') && (
-                <button onClick={iniciarCancelDia}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-100">
-                  <X className="w-3.5 h-3.5" /> Cancelar todos
-                </button>
-              )}
-            </div>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin w-7 h-7 border-4 border-blue-600 border-t-transparent rounded-full" />
-              </div>
-            ) : (
-              <AgendaDia />
-            )}
-          </div>
-        </div>
+        ) : (
+          <GrillaSemana />
+        )
       )}
 
       {/* VISTA MES */}
@@ -417,7 +491,6 @@ export default function TurnosPage() {
             </div>
           </Card>
 
-          {/* Turnos del día seleccionado */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold text-gray-900 capitalize">
@@ -448,9 +521,8 @@ export default function TurnosPage() {
           onClose={() => setModalNuevoTurno(false)}
           onSuccess={() => {
             setModalNuevoTurno(false)
-            cargarTurnosDia(fechaSeleccionada)
-            if (vista === 'semana') cargarTurnosSemana(fechaRef)
-            else cargarDiasConTurnosMes(fechaRef)
+            cargarTurnosSemana(fechaRef)
+            if (vista === 'mes') cargarDiasConTurnosMes(fechaRef)
           }}
           config={config}
           fechaInicial={fechaSeleccionada}
