@@ -23,11 +23,12 @@ interface Props {
   onSuccess: () => void
   config: Configuracion | null
   fechaInicial?: string
+  horaInicial?: string
 }
 
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 
-export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fechaInicial }: Props) {
+export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fechaInicial, horaInicial }: Props) {
   const [paso, setPaso] = useState<'paciente' | 'tipo' | 'fecha' | 'hora'>('paciente')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -46,7 +47,7 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
   // Fecha y hora
   const [mesActual, setMesActual] = useState(new Date())
   const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaInicial || '')
-  const [horaSeleccionada, setHoraSeleccionada] = useState('')
+  const [horaSeleccionada, setHoraSeleccionada] = useState(horaInicial || '')
   const [horarios, setHorarios] = useState<{ hora: string; disponible: boolean }[]>([])
   const [modalidad, setModalidad] = useState<'presencial' | 'videollamada'>('videollamada')
   const [notas, setNotas] = useState('')

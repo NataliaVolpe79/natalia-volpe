@@ -40,6 +40,7 @@ export default function TurnosPage() {
   const [loading, setLoading] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos')
   const [modalNuevoTurno, setModalNuevoTurno] = useState(false)
+  const [horaSlot, setHoraSlot] = useState('')
   const [turnoEditar, setTurnoEditar] = useState<TurnoConPaciente | null>(null)
   const [notasEditar, setNotasEditar] = useState('')
   const [error, setError] = useState('')
@@ -291,6 +292,7 @@ export default function TurnosPage() {
                     className="px-2 py-2 bg-green-50 border border-dashed border-green-200 rounded-lg hover:bg-green-100 hover:border-green-400 transition-all text-left group"
                     onClick={() => {
                       setFechaSeleccionada(fechaStr)
+                      setHoraSlot(hora)
                       setModalNuevoTurno(true)
                     }}
                   >
@@ -380,7 +382,7 @@ export default function TurnosPage() {
               </div>
               <span className="text-green-700 font-semibold text-sm flex-1">Disponible</span>
               <button
-                onClick={() => setModalNuevoTurno(true)}
+                onClick={() => { setHoraSlot(hora); setModalNuevoTurno(true) }}
                 className="text-xs text-green-600 font-bold hover:text-green-800 px-2 py-1 rounded-lg hover:bg-green-100"
               >
                 + Asignar
@@ -518,14 +520,17 @@ export default function TurnosPage() {
       {modalNuevoTurno && (
         <FormularioTurno
           isOpen={modalNuevoTurno}
-          onClose={() => setModalNuevoTurno(false)}
+          onClose={() => { setModalNuevoTurno(false); setHoraSlot('') }}
           onSuccess={() => {
             setModalNuevoTurno(false)
+            setHoraSlot('')
             cargarTurnosSemana(fechaRef)
+            cargarTurnosDia(fechaSeleccionada)
             if (vista === 'mes') cargarDiasConTurnosMes(fechaRef)
           }}
           config={config}
           fechaInicial={fechaSeleccionada}
+          horaInicial={horaSlot}
         />
       )}
 
