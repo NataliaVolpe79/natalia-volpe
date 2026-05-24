@@ -71,6 +71,10 @@ export default function SacarTurnoPage() {
 
       if (configRes.data) setConfig(configRes.data)
 
+      if (pacienteRes.error) {
+        setError(`Debug lookup: ${pacienteRes.error.message} (${pacienteRes.error.code})`)
+        return
+      }
       if (pacienteRes.data) {
         setPaciente(pacienteRes.data as Paciente)
         setEsPrimeraTurno(false)
