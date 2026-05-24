@@ -5,7 +5,7 @@ import { format, parseISO, differenceInHours, addDays, startOfDay } from 'date-f
 import { es } from 'date-fns/locale'
 import { Bell, CheckCircle, Phone, Clock, Info } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { TurnoConPaciente } from '@/lib/types'
+import { Configuracion, TurnoConPaciente } from '@/lib/types'
 import { formatHora, linkWhatsApp } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -13,12 +13,16 @@ import Button from '@/components/ui/Button'
 export default function RecordatoriosPage() {
   const [proximos, setProximos] = useState<{ turno: TurnoConPaciente; tipo: '24h' | '1h' }[]>([])
   const [enviados, setEnviados] = useState<{ turno: TurnoConPaciente; tipo: string }[]>([])
+  const [config, setConfig] = useState<Configuracion | null>(null)
   const [loading, setLoading] = useState(true)
   const [marcando, setMarcando] = useState<string | null>(null)
 
   const cargarRecordatorios = useCallback(async () => {
     setLoading(true)
     try {
+      const { data: cfg } = await supabase.from('configuracion').select('*').single()
+      if (cfg) setConfig(cfg)
+
       const ahora = new Date()
       const hoy = format(ahora, 'yyyy-MM-dd')
       const manana = format(addDays(startOfDay(ahora), 1), 'yyyy-MM-dd')
@@ -90,11 +94,28 @@ export default function RecordatoriosPage() {
     const fecha = format(parseISO(turno.fecha), "EEEE d 'de' MMMM", { locale: es })
     const hora = formatHora(turno.hora)
     const mod = turno.modalidad === 'presencial' ? 'presencial' : 'por videollamada'
+    const nombre = turno.paciente?.nombre ?? ''
+    const esOsde = (turno.paciente?.obra_social ?? '').toLowerCase().includes('osde')
 
-    if (tipo === '24h') {
-      return `Hola ${turno.paciente?.nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (atención ${mod}). Cualquier consulta escribime por acá. ¡Hasta mañana!`
+    const alias = config?.alias_pago ?? 'Nat.wer'
+
+    if (esOsde) {
+      const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
+      const dni = config?.dni_credencial ?? '27308144'
+      if (tipo === '24h') {
+        return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* antes de la consulta.\nAdemás, enviá tu credencial de OSDE compartida (DNI ${dni}) por este WhatsApp. ¡Hasta mañana!`
+      }
+      return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).\nCopago OSDE: ${copago} al alias *${alias}*. Recordá enviá la credencial de OSDE (DNI ${dni}). ¡Nos vemos pronto!`
     }
-    return `Hola ${turno.paciente?.nombre}! Te recuerdo que en aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}). ¡Nos vemos pronto!`
+
+    // Particular
+    const total = config?.valor_consulta_particular
+    const mitad = total ? `$${Math.round(total / 2)}` : ''
+    const pagoLinea = mitad ? `\nTransferí ${mitad} al alias *${alias}* antes de la consulta.` : ''
+    if (tipo === '24h') {
+      return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${pagoLinea} ¡Hasta mañana!`
+    }
+    return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).${pagoLinea} ¡Nos vemos pronto!`
   }
 
   return (

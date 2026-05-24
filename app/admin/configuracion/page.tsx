@@ -107,6 +107,28 @@ export default function ConfiguracionPage() {
     }
   }
 
+  async function guardarPagos() {
+    if (!config) return
+    setGuardando(true)
+    setError('')
+    try {
+      const { error: e } = await supabase.from('configuracion').update({
+        copago_osde: config.copago_osde,
+        alias_pago: config.alias_pago,
+        dni_credencial: config.dni_credencial,
+        valor_consulta_particular: config.valor_consulta_particular,
+        updated_at: new Date().toISOString(),
+      }).eq('id', config.id)
+      if (e) throw e
+      setExito('pagos')
+      setTimeout(() => setExito(''), 3000)
+    } catch {
+      setError('No se pudo guardar los datos de pago')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   function agregarFeriado() {
     if (!config || !nuevoFeriado) return
     if (config.feriados.includes(nuevoFeriado)) return
@@ -232,6 +254,7 @@ export default function ConfiguracionPage() {
 
       {exito === 'config' && <Alert type="success">¡Configuración guardada!</Alert>}
       {exito === 'lote' && <Alert type="success">¡Bloque de horario guardado!</Alert>}
+      {exito === 'pagos' && <Alert type="success">¡Datos de pago guardados!</Alert>}
       {error && <Alert type="error">{error}</Alert>}
 
       {/* ============ SECCIÓN 1: Días de atención ============ */}
@@ -490,7 +513,42 @@ export default function ConfiguracionPage() {
         )}
       </Card>
 
-      {/* ============ SECCIÓN 3: Feriados ============ */}
+      {/* ============ SECCIÓN 3: Pagos y recordatorios ============ */}
+      <Card>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Pagos y recordatorios</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Estos datos se incluyen automáticamente en los mensajes de recordatorio por WhatsApp.
+        </p>
+        <div className="grid grid-cols-2 gap-4 mb-5">
+          <Input
+            label="Copago OSDE ($)"
+            type="number" min={0}
+            value={config.copago_osde ?? ''}
+            onChange={e => setConfig({ ...config, copago_osde: parseInt(e.target.value) || 0 })}
+          />
+          <Input
+            label="Consulta particular ($)"
+            type="number" min={0}
+            value={config.valor_consulta_particular ?? ''}
+            onChange={e => setConfig({ ...config, valor_consulta_particular: parseInt(e.target.value) || 0 })}
+          />
+          <Input
+            label="Alias de pago"
+            value={config.alias_pago ?? ''}
+            onChange={e => setConfig({ ...config, alias_pago: e.target.value })}
+          />
+          <Input
+            label="DNI credencial OSDE"
+            value={config.dni_credencial ?? ''}
+            onChange={e => setConfig({ ...config, dni_credencial: e.target.value })}
+          />
+        </div>
+        <Button variant="success" className="w-full sm:w-auto" onClick={guardarPagos} loading={guardando}>
+          <Save className="w-5 h-5" /> Guardar pagos
+        </Button>
+      </Card>
+
+      {/* ============ SECCIÓN 4: Feriados ============ */}
       <Card>
         <h2 className="text-lg font-bold text-gray-900 mb-4">Feriados y días sin atención</h2>
         <div className="flex gap-3 mb-4">

@@ -15,6 +15,10 @@ export interface Configuracion {
   feriados: string[]
   buffer_minutos: number
   duracion_primera_consulta_minutos: number
+  copago_osde?: number
+  alias_pago?: string
+  dni_credencial?: string
+  valor_consulta_particular?: number
   updated_at: string
 }
 
