@@ -63,18 +63,16 @@ export default function SacarTurnoPage() {
       // Cargar config y buscar paciente en paralelo
       const [configRes, pacienteRes] = await Promise.all([
         supabase.from('configuracion').select('*').single(),
-        fetch('/api/buscar-paciente', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telefono: tel }),
-        }),
+        supabase.from('pacientes')
+          .select('id, nombre, apellido, telefono, duracion_seguimiento_minutos')
+          .eq('telefono', tel)
+          .maybeSingle(),
       ])
 
       if (configRes.data) setConfig(configRes.data)
 
-      const data = await pacienteRes.json()
-      if (data.encontrado) {
-        setPaciente(data.paciente as Paciente)
+      if (pacienteRes.data) {
+        setPaciente(pacienteRes.data as Paciente)
         setEsPrimeraTurno(false)
         setPaso(2)
       } else {
