@@ -16,7 +16,7 @@ const navItems = [
   { href: '/admin/pacientes', label: 'Pacientes', Icon: Users },
   { href: '/admin/pagos', label: 'Pagos', Icon: CreditCard },
   { href: '/admin/recordatorios', label: 'Recordatorios', Icon: Bell },
-  { href: '/admin/configuracion', label: 'Config', Icon: Settings },
+  { href: '/admin/configuracion', label: 'Configuración', Icon: Settings },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -145,7 +145,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               ].join(' ')}
             >
               <Icon className="w-6 h-6" />
-              <span className="text-xs font-medium">{label}</span>
+              <span className="text-xs font-medium truncate w-full text-center">{label}</span>
             </Link>
           ))}
         </div>
