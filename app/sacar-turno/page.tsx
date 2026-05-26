@@ -28,7 +28,7 @@ type Paciente = { id: string; nombre: string; apellido: string }
 
 export default function SacarTurnoPage() {
   const router = useRouter()
-  const [paso, setPaso] = useState<0 | 1 | 2 | 3 | 4>(0)
+  const [paso, setPaso] = useState<0 | 1 | 'info' | 2 | 3 | 4>(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -173,7 +173,7 @@ export default function SacarTurnoPage() {
       const nuevoPaciente = { id: newId, nombre: nombre.trim(), apellido: apellido.trim() }
       setPaciente(nuevoPaciente)
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ telefono: tel, paciente: nuevoPaciente }))
-      setPaso(4) // redirige a WhatsApp, no al calendario
+      setPaso('info')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Hubo un error. Intentá de nuevo.')
     } finally {
@@ -205,7 +205,8 @@ export default function SacarTurnoPage() {
         duracion: t.duracion_minutos,
       }))
 
-      setHorarios(calcularHorariosEnLotes(lotesData || [], ocupados, DURACION, 'seguimiento', 0, false))
+      const duracion = esPrimeraTurno ? (config.duracion_primera_consulta_minutos ?? 60) : DURACION
+      setHorarios(calcularHorariosEnLotes(lotesData || [], ocupados, duracion, 'seguimiento', 0, false))
       setPaso(3)
     } finally {
       setLoading(false)
@@ -225,7 +226,7 @@ export default function SacarTurnoPage() {
         paciente_id: paciente.id,
         fecha: fechaSeleccionada,
         hora: horaSeleccionada,
-        duracion_minutos: DURACION,
+        duracion_minutos: esPrimeraTurno ? (config?.duracion_primera_consulta_minutos ?? 60) : DURACION,
         modalidad,
         estado: 'pendiente',
         tipo_turno: esPrimeraTurno ? 'primera_consulta' : 'seguimiento',
@@ -363,8 +364,21 @@ export default function SacarTurnoPage() {
     ? `${paciente.nombre} ${paciente.apellido}`
     : `${nombre} ${apellido}`.trim()
 
-  const totalPasos = 3
-  const pasoDisplay = Math.min(paso, totalPasos)
+  const totalPasos = esPrimeraTurno ? 4 : 3
+  function getPasoDisplay(): number {
+    if (esPrimeraTurno) {
+      if (paso === 1) return 1
+      if (paso === 'info') return 2
+      if (paso === 2) return 3
+      if (paso === 3) return 4
+    } else {
+      if (paso === 2) return 1
+      if (paso === 3) return 2
+    }
+    return 0
+  }
+  const pasoDisplay = getPasoDisplay()
+  const esPasoActivo = paso !== 0 && paso !== 4
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -373,8 +387,11 @@ export default function SacarTurnoPage() {
           <button
             onClick={() => {
               if (paso === 0 || paso === 4) return router.push('/')
+              if (paso === 'info') return setPaso(1)
+              if (paso === 2 && esPrimeraTurno) return setPaso('info')
               if (paso === 2 && paciente) return router.push('/')
-              setPaso(p => (p - 1) as typeof paso)
+              if (paso === 3) return setPaso(2)
+              setPaso(p => (typeof p === 'number' ? p - 1 : 1) as typeof paso)
             }}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
           >
@@ -382,17 +399,17 @@ export default function SacarTurnoPage() {
           </button>
           <div className="flex-1">
             <p className="text-sm text-gray-500">Reservar turno</p>
-            {paso > 0 && paso < 4 && (
+            {esPasoActivo && pasoDisplay > 0 && (
               <p className="text-base font-bold text-gray-900">Paso {pasoDisplay} de {totalPasos}</p>
             )}
           </div>
-          {paciente && paso > 0 && paso < 4 && (
+          {paciente && esPasoActivo && (
             <button onClick={cerrarSesion} className="text-sm text-blue-500 hover:text-blue-700 font-semibold border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors shrink-0">
               Cambiar cuenta
             </button>
           )}
         </div>
-        {paso > 0 && paso < 4 && (
+        {esPasoActivo && pasoDisplay > 0 && (
           <div className="h-1 bg-gray-100">
             <div className="h-full bg-blue-600 transition-all duration-500"
               style={{ width: `${(pasoDisplay / totalPasos) * 100}%` }} />
@@ -499,8 +516,47 @@ export default function SacarTurnoPage() {
               </div>
 
               <Button size="lg" fullWidth onClick={registrarYContinuar} loading={loading}>
-                Registrarme y ver turnos →
+                Registrarme →
               </Button>
+            </motion.div>
+          )}
+
+          {/* ======= INFO: Primera consulta ======= */}
+          {paso === 'info' && (
+            <motion.div key="pasoInfo"
+              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+              className="flex flex-col gap-6"
+            >
+              <div className="flex flex-col items-center text-center gap-4 py-4">
+                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-4xl">
+                  🩺
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">Tu primera consulta</h1>
+                  <p className="text-gray-500 text-lg leading-relaxed">
+                    Es una consulta inicial de <strong className="text-gray-800">60 minutos</strong> con la Dra. Natalia Volpe.
+                  </p>
+                  <p className="text-gray-500 text-lg leading-relaxed mt-2">
+                    Seleccioná el día y horario que mejor te quede. Si tenés alguna duda, podés escribir por WhatsApp.
+                  </p>
+                </div>
+              </div>
+
+              <Button size="lg" fullWidth onClick={() => setPaso(2)}>
+                Elegir día y horario →
+              </Button>
+
+              <a
+                href={`https://wa.me/${WHATSAPP}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <Button size="lg" fullWidth variant="secondary">
+                  <MessageCircle className="w-5 h-5" />
+                  Escribir por WhatsApp
+                </Button>
+              </a>
             </motion.div>
           )}
 
@@ -560,7 +616,7 @@ export default function SacarTurnoPage() {
                     {modalidad === 'presencial' ? '📍 Presencial' : '💻 Videollamada'}
                   </span>
                 </div>
-                <p className="text-sm text-gray-400 mt-1">Duración: {DURACION} min</p>
+                <p className="text-sm text-gray-400 mt-1">Duración: {esPrimeraTurno ? (config?.duracion_primera_consulta_minutos ?? 60) : DURACION} min</p>
               </div>
 
               {error && <Alert type="error">{error}</Alert>}
@@ -618,65 +674,9 @@ export default function SacarTurnoPage() {
             </motion.div>
           )}
 
-          {/* ======= PASO 4a: WhatsApp — paciente nuevo ======= */}
-          {paso === 4 && esPrimeraTurno && (
-            <motion.div key="paso4a"
-              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center text-center gap-8 py-8"
-            >
-              <motion.div
-                initial={{ scale: 0 }} animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.15, stiffness: 200 }}
-                className="w-28 h-28 bg-green-100 rounded-full flex items-center justify-center"
-              >
-                <MessageCircle className="w-16 h-16 text-green-600" />
-              </motion.div>
-
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-3">¡Registrado!</h1>
-                <p className="text-gray-500 text-lg">
-                  Escribile a la Dra. Volpe por WhatsApp para coordinar el día y horario de tu primera consulta.
-                </p>
-              </div>
-
-              <div className="w-full bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-left flex flex-col gap-3">
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-gray-500">Nombre</span>
-                  <span className="font-bold text-gray-900">{nombreCompleto}</span>
-                </div>
-                <div className={`flex justify-between items-center py-2 ${obraSocial === 'Particular' ? 'border-b border-gray-100' : ''}`}>
-                  <span className="text-gray-500">Cobertura</span>
-                  <span className="font-bold text-gray-900">{obraSocial}</span>
-                </div>
-                {obraSocial === 'Particular' && (
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-500">Valor consulta</span>
-                    <span className="font-bold text-purple-700">$65.000</span>
-                  </div>
-                )}
-              </div>
-
-              <a
-                href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola! Soy ${nombreCompleto} y me acabo de registrar. Quisiera coordinar mi primera consulta.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-              >
-                <Button size="lg" fullWidth variant="success">
-                  <MessageCircle className="w-6 h-6" />
-                  Escribir a la Dra. por WhatsApp
-                </Button>
-              </a>
-
-              <Button size="lg" fullWidth variant="secondary" onClick={() => router.push('/')}>
-                Volver al inicio
-              </Button>
-            </motion.div>
-          )}
-
-          {/* ======= PASO 4b: Confirmación — paciente existente ======= */}
-          {paso === 4 && !esPrimeraTurno && (
-            <motion.div key="paso4b"
+          {/* ======= PASO 4: Confirmación ======= */}
+          {paso === 4 && (
+            <motion.div key="paso4"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center text-center gap-8 py-8"
             >
