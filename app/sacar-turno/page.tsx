@@ -325,7 +325,8 @@ export default function SacarTurnoPage() {
             const fechaStr = format(dia, 'yyyy-MM-dd')
             const esLaborable = esDiaLaborable(fechaStr, config) && !isBefore(dia, hoy)
             const estaLleno = diasSinDisponibilidad.has(fechaStr)
-            const disponible = esLaborable && !estaLleno
+            const esDisponibleParaPaciente = fechaStr >= '2026-07-01'
+            const disponible = esLaborable && !estaLleno && esDisponibleParaPaciente
             const esPresencial = esLaborable && getModalidadPorFecha(fechaStr, config) === 'presencial'
             const sel = fechaStr === fechaSeleccionada
             return (

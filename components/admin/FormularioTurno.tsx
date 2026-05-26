@@ -38,7 +38,7 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
   const [resultados, setResultados] = useState<Paciente[]>([])
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null)
   const [creandoPaciente, setCreandoPaciente] = useState(false)
-  const [nuevoPaciente, setNuevoPaciente] = useState({ nombre: '', apellido: '', telefono: '' })
+  const [nuevoPaciente, setNuevoPaciente] = useState({ nombre: '', apellido: '', telefono: '', obra_social: 'OSDE' as 'OSDE' | 'Particular' })
 
   // Tipo de turno y duración
   const [tipoTurno, setTipoTurno] = useState<TipoTurno>('seguimiento')
@@ -141,6 +141,7 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
           nombre: nuevoPaciente.nombre.trim(),
           apellido: nuevoPaciente.apellido.trim(),
           telefono: nuevoPaciente.telefono.replace(/\D/g, ''),
+          obra_social: nuevoPaciente.obra_social,
         })
         .select()
         .single()
@@ -285,6 +286,21 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
           <Input label="Teléfono *" type="tel" inputMode="numeric" hint="Sin el 15"
             value={nuevoPaciente.telefono}
             onChange={e => setNuevoPaciente(p => ({ ...p, telefono: e.target.value }))} />
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">Cobertura médica</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button"
+                onClick={() => setNuevoPaciente(p => ({ ...p, obra_social: 'OSDE' }))}
+                className={`py-3 rounded-xl border-2 font-semibold text-sm transition-all ${nuevoPaciente.obra_social === 'OSDE' ? 'border-cyan-500 bg-cyan-50 text-cyan-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
+                🏥 OSDE
+              </button>
+              <button type="button"
+                onClick={() => setNuevoPaciente(p => ({ ...p, obra_social: 'Particular' }))}
+                className={`py-3 rounded-xl border-2 font-semibold text-sm transition-all ${nuevoPaciente.obra_social === 'Particular' ? 'border-purple-500 bg-purple-50 text-purple-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
+                💳 Particular
+              </button>
+            </div>
+          </div>
           <div className="flex gap-3">
             <Button variant="secondary" fullWidth onClick={() => { setCreandoPaciente(false); setError('') }}>Cancelar</Button>
             <Button fullWidth onClick={crearPaciente} loading={loading}>Crear</Button>
