@@ -717,7 +717,7 @@ export default function SacarTurnoPage() {
               </div>
 
               <Alert type="info">
-                Te recordamos por WhatsApp <strong>24 horas antes</strong> de tu turno.
+                Te recordamos por WhatsApp el <strong>día anterior</strong> a tu turno.
               </Alert>
 
               <div className="w-full flex flex-col gap-3">
