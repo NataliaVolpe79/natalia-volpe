@@ -527,6 +527,16 @@ export default function SacarTurnoPage() {
                 ) : <Calendario />}
               </div>
 
+              <p className="text-center text-sm text-gray-400">
+                ¿Ya tenés un turno?{' '}
+                <button
+                  onClick={() => router.push('/mis-turnos')}
+                  className="text-blue-500 font-semibold hover:text-blue-700 underline underline-offset-2"
+                >
+                  Ver mis turnos →
+                </button>
+              </p>
+
             </motion.div>
           )}
 
