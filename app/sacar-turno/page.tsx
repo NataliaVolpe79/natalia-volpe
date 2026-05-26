@@ -11,7 +11,7 @@ import Input from '@/components/ui/Input'
 import Alert from '@/components/ui/Alert'
 import { supabase } from '@/lib/supabase'
 import { calcularHorariosEnLotes, getModalidadPorFecha, esDiaLaborable, formatHora } from '@/lib/utils'
-import { Configuracion } from '@/lib/types'
+import { Configuracion, LoteHorario } from '@/lib/types'
 
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_CONTACTO || '549XXXXXXXXXX'
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
@@ -50,6 +50,8 @@ export default function SacarTurnoPage() {
   const [horarios, setHorarios] = useState<{ hora: string; disponible: boolean }[]>([])
   const [modalidad, setModalidad] = useState<'presencial' | 'videollamada'>('videollamada')
   const [mesActual, setMesActual] = useState(new Date())
+  const [lotesAll, setLotesAll] = useState<LoteHorario[]>([])
+  const [diasSinDisponibilidad, setDiasSinDisponibilidad] = useState<Set<string>>(new Set())
 
   // Auto-login desde localStorage
   useEffect(() => {
@@ -237,6 +239,41 @@ export default function SacarTurnoPage() {
     }
   }
 
+  // Cargar lotes una vez
+  useEffect(() => {
+    supabase.from('lotes_horarios').select('*').order('orden')
+      .then(({ data }) => setLotesAll(data || []))
+  }, [])
+
+  // Verificar qué días del mes visible están completos
+  useEffect(() => {
+    if (!config || lotesAll.length === 0) return
+    const inicio = format(startOfMonth(mesActual), 'yyyy-MM-dd')
+    const fin = format(endOfMonth(mesActual), 'yyyy-MM-dd')
+    supabase.from('turnos')
+      .select('fecha, hora, duracion_minutos')
+      .gte('fecha', inicio).lte('fecha', fin)
+      .in('estado', ['pendiente', 'confirmado'])
+      .then(({ data: turnosDelMes }) => {
+        const hoy = startOfDay(new Date())
+        const dias = eachDayOfInterval({ start: startOfMonth(mesActual), end: endOfMonth(mesActual) })
+        const sinDisp = new Set<string>()
+        for (const dia of dias) {
+          const fechaStr = format(dia, 'yyyy-MM-dd')
+          if (!esDiaLaborable(fechaStr, config) || isBefore(dia, hoy)) continue
+          const diaNombre = format(dia, 'EEEE', { locale: es }).toLowerCase()
+          const lotesDelDia = lotesAll.filter(l => l.dia === diaNombre)
+          const ocupados = (turnosDelMes || [])
+            .filter(t => t.fecha === fechaStr)
+            .map(t => ({ hora: t.hora.substring(0, 5), duracion: t.duracion_minutos }))
+          const slots = calcularHorariosEnLotes(lotesDelDia, ocupados, DURACION, 'seguimiento', 0, false)
+          if (!slots.some(h => h.disponible)) sinDisp.add(fechaStr)
+        }
+        setDiasSinDisponibilidad(sinDisp)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesActual, config, lotesAll])
+
   // ----------------------------------------------------------------
   // Calendario
   // ----------------------------------------------------------------
@@ -284,8 +321,10 @@ export default function SacarTurnoPage() {
           {Array.from({ length: primerDia }).map((_, i) => <div key={`e${i}`} />)}
           {dias.map(dia => {
             const fechaStr = format(dia, 'yyyy-MM-dd')
-            const disponible = esDiaLaborable(fechaStr, config) && !isBefore(dia, hoy)
-            const esPresencial = disponible && getModalidadPorFecha(fechaStr, config) === 'presencial'
+            const esLaborable = esDiaLaborable(fechaStr, config) && !isBefore(dia, hoy)
+            const estaLleno = diasSinDisponibilidad.has(fechaStr)
+            const disponible = esLaborable && !estaLleno
+            const esPresencial = esLaborable && getModalidadPorFecha(fechaStr, config) === 'presencial'
             const sel = fechaStr === fechaSeleccionada
             return (
               <button
@@ -298,6 +337,8 @@ export default function SacarTurnoPage() {
                     ? esPresencial ? 'bg-green-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md'
                     : disponible
                     ? esPresencial ? 'bg-green-50 text-green-800 hover:bg-green-100 active:scale-95' : 'bg-blue-50 text-blue-800 hover:bg-blue-100 active:scale-95'
+                    : estaLleno
+                    ? 'bg-red-50 text-red-300 cursor-not-allowed'
                     : 'text-gray-300 cursor-not-allowed',
                 ].join(' ')}
               >
@@ -306,6 +347,9 @@ export default function SacarTurnoPage() {
                   <span className="text-[9px] leading-none mt-0.5">
                     {esPresencial ? '📍' : '💻'}
                   </span>
+                )}
+                {estaLleno && (
+                  <span className="text-[9px] leading-none mt-0.5">lleno</span>
                 )}
               </button>
             )
