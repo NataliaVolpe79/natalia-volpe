@@ -371,7 +371,11 @@ export default function SacarTurnoPage() {
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-6 py-4 flex items-center gap-4">
           <button
-            onClick={() => paso === 0 || paso === 4 ? router.push('/') : setPaso(p => (p - 1) as typeof paso)}
+            onClick={() => {
+              if (paso === 0 || paso === 4) return router.push('/')
+              if (paso === 2 && paciente) return router.push('/')
+              setPaso(p => (p - 1) as typeof paso)
+            }}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
           >
             <ArrowLeft className="w-6 h-6 text-gray-600" />
