@@ -28,7 +28,8 @@ type Paciente = { id: string; nombre: string; apellido: string }
 
 export default function SacarTurnoPage() {
   const router = useRouter()
-  const [paso, setPaso] = useState<0 | 1 | 'info' | 2 | 3 | 4>(0)
+  const [paso, setPaso] = useState<0 | 1 | 'consulta' | 'info' | 2 | 3 | 4>(0)
+  const [esNuevoPaciente, setEsNuevoPaciente] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -173,7 +174,8 @@ export default function SacarTurnoPage() {
       const nuevoPaciente = { id: newId, nombre: nombre.trim(), apellido: apellido.trim() }
       setPaciente(nuevoPaciente)
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ telefono: tel, paciente: nuevoPaciente }))
-      setPaso('info')
+      setEsNuevoPaciente(true)
+      setPaso('consulta')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Hubo un error. Intentá de nuevo.')
     } finally {
@@ -366,13 +368,12 @@ export default function SacarTurnoPage() {
     ? `${paciente.nombre} ${paciente.apellido}`
     : `${nombre} ${apellido}`.trim()
 
-  const totalPasos = esPrimeraTurno ? 4 : 3
+  const totalPasos = esNuevoPaciente ? 3 : 2
   function getPasoDisplay(): number {
-    if (esPrimeraTurno) {
+    if (esNuevoPaciente) {
       if (paso === 1) return 1
-      if (paso === 'info') return 2
-      if (paso === 2) return 3
-      if (paso === 3) return 4
+      if (paso === 2) return 2
+      if (paso === 3) return 3
     } else {
       if (paso === 2) return 1
       if (paso === 3) return 2
@@ -389,8 +390,10 @@ export default function SacarTurnoPage() {
           <button
             onClick={() => {
               if (paso === 0 || paso === 4) return router.push('/')
-              if (paso === 'info') return setPaso(1)
+              if (paso === 'consulta') return setPaso(1)
+              if (paso === 'info') return setPaso('consulta')
               if (paso === 2 && esPrimeraTurno) return setPaso('info')
+              if (paso === 2 && esNuevoPaciente) return setPaso('consulta')
               if (paso === 2 && paciente) return router.push('/')
               if (paso === 3) return setPaso(2)
               setPaso(p => (typeof p === 'number' ? p - 1 : 1) as typeof paso)
@@ -520,6 +523,43 @@ export default function SacarTurnoPage() {
               <Button size="lg" fullWidth onClick={registrarYContinuar} loading={loading}>
                 Registrarme →
               </Button>
+            </motion.div>
+          )}
+
+          {/* ======= CONSULTA: Primera vez con la Dra.? ======= */}
+          {paso === 'consulta' && (
+            <motion.div key="pasoConsulta"
+              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+              className="flex flex-col gap-6"
+            >
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Una pregunta más</h1>
+                <p className="text-gray-500 text-lg">¿Es tu primera consulta con la Dra. Volpe?</p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => { setEsPrimeraTurno(true); setPaso('info') }}
+                  className="w-full p-5 bg-white rounded-2xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left flex items-center gap-4"
+                >
+                  <span className="text-3xl">👋</span>
+                  <div>
+                    <p className="font-bold text-gray-900 text-lg">Sí, es mi primera vez</p>
+                    <p className="text-sm text-gray-500">Nunca consulté con la Dra. Volpe</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setEsPrimeraTurno(false); setPaso(2) }}
+                  className="w-full p-5 bg-white rounded-2xl border-2 border-gray-200 hover:border-green-400 hover:bg-green-50 transition-all text-left flex items-center gap-4"
+                >
+                  <span className="text-3xl">✅</span>
+                  <div>
+                    <p className="font-bold text-gray-900 text-lg">No, ya fui antes</p>
+                    <p className="text-sm text-gray-500">Ya tuve una consulta con la Dra. Volpe</p>
+                  </div>
+                </button>
+              </div>
             </motion.div>
           )}
 
