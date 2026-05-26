@@ -86,7 +86,7 @@ export default function HomePage() {
             <div className="text-left">
               <p className="font-bold text-gray-900 text-lg">Recordatorio automático</p>
               <p className="text-gray-500 text-base mt-1">
-                Te avisamos por WhatsApp 24 horas y 1 hora antes de tu turno.
+                Te avisamos por WhatsApp el día anterior a tu turno.
               </p>
             </div>
           </div>
