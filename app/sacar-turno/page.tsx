@@ -206,7 +206,7 @@ export default function SacarTurnoPage() {
       }))
 
       const duracion = esPrimeraTurno ? (config.duracion_primera_consulta_minutos ?? 60) : DURACION
-      setHorarios(calcularHorariosEnLotes(lotesData || [], ocupados, duracion, 'seguimiento', 0, false))
+      setHorarios(calcularHorariosEnLotes(lotesData || [], ocupados, duracion, 'seguimiento', 0, false, esPrimeraTurno ? DURACION : undefined))
       setPaso(3)
     } finally {
       setLoading(false)
@@ -267,7 +267,8 @@ export default function SacarTurnoPage() {
           const ocupados = (turnosDelMes || [])
             .filter(t => t.fecha === fechaStr)
             .map(t => ({ hora: t.hora.substring(0, 5), duracion: t.duracion_minutos }))
-          const slots = calcularHorariosEnLotes(lotesDelDia, ocupados, DURACION, 'seguimiento', 0, false)
+          const durCheck = esPrimeraTurno ? (config.duracion_primera_consulta_minutos ?? 60) : DURACION
+          const slots = calcularHorariosEnLotes(lotesDelDia, ocupados, durCheck, 'seguimiento', 0, false, esPrimeraTurno ? DURACION : undefined)
           if (!slots.some(h => h.disponible)) sinDisp.add(fechaStr)
         }
         setDiasSinDisponibilidad(sinDisp)

@@ -94,7 +94,8 @@ export function calcularHorariosEnLotes(
   duracionNueva: number,
   tipo: 'primera_consulta' | 'seguimiento',
   bufferMinutos: number = 0,
-  llenadoSecuencial: boolean = false
+  llenadoSecuencial: boolean = false,
+  stepMinutos?: number
 ): HorarioDisponible[] {
   const lotesOrdenados = [...lotes].sort(
     (a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio)
@@ -113,7 +114,7 @@ export function calcularHorariosEnLotes(
     } else {
       const loteIni = timeToMinutes(lote.hora_inicio)
       const loteFin = timeToMinutes(lote.hora_fin)
-      const step = duracionNueva + bufferMinutos
+      const step = stepMinutos ?? (duracionNueva + bufferMinutos)
       let actual = loteIni
       while (actual + duracionNueva <= loteFin) {
         const horaStr = minutesToTime(actual)
