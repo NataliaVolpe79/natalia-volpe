@@ -514,7 +514,7 @@ export default function SacarTurnoPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-3">
-                    {horarios.filter(h => h.disponible).map(h => (
+                    {horarios.map(h => h.disponible ? (
                       <button
                         key={h.hora}
                         onClick={() => setHoraSeleccionada(h.hora)}
@@ -527,8 +527,16 @@ export default function SacarTurnoPage() {
                       >
                         {h.hora}
                       </button>
+                    ) : (
+                      <div
+                        key={h.hora}
+                        className="py-4 rounded-xl text-lg font-bold bg-red-50 text-red-300 border border-red-100 flex flex-col items-center justify-center gap-0.5 cursor-not-allowed"
+                      >
+                        <span>{h.hora}</span>
+                        <span className="text-[10px] font-semibold text-red-300">Ocupado</span>
+                      </div>
                     ))}
-                    {horarios.filter(h => h.disponible).length === 0 && (
+                    {horarios.filter(h => h.disponible).length === 0 && horarios.length === 0 && (
                       <div className="col-span-3 text-center py-8 text-gray-500">
                         No hay horarios disponibles para este día.
                         <br />
