@@ -627,6 +627,9 @@ export default function TurnosPage() {
                 <span>🕐 {formatHora(turnoAcciones.hora)} hs</span>
                 <span>{turnoAcciones.modalidad === 'presencial' ? '📍 Presencial' : '💻 Videollamada'}</span>
                 <span>{turnoAcciones.duracion_minutos} min</span>
+                {turnoAcciones.paciente?.telefono && (
+                  <span>📱 {turnoAcciones.paciente.telefono}</span>
+                )}
               </div>
               <Badge className={colorEstadoTurno[turnoAcciones.estado]}>{labelEstadoTurno[turnoAcciones.estado]}</Badge>
             </div>
