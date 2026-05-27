@@ -96,6 +96,65 @@ export interface TurnoOcupado {
   duracion: number    // minutos
 }
 
+export interface HistoriaClinicaDatos {
+  // Datos personales
+  nombre?: string
+  apellido?: string
+  dni?: string
+  fecha_nacimiento?: string
+  domicilio?: string
+  telefono?: string
+  email?: string
+  obra_social?: string
+  numero_afiliado?: string
+  ocupacion?: string
+  escolaridad?: string
+  estado_civil?: string
+  hijos?: string
+  convivencia?: string
+  // Motivo de consulta
+  motivo_consulta?: string
+  // Examen semiológico
+  conciencia?: string
+  atencion?: string
+  memoria?: string
+  orientacion?: string
+  lenguaje?: string
+  pensamiento_curso?: string
+  pensamiento_contenido?: string
+  percepciones?: string
+  afecto?: string
+  conducta?: string
+  critica_insight?: string
+  // Hábitos
+  sueno?: string
+  alimentacion?: string
+  actividad_fisica?: string
+  sustancias?: string
+  // Enfermedad actual
+  antecedentes_personales?: string
+  antecedentes_familiares?: string
+  tratamientos_previos?: string
+  medicacion_actual?: string
+  alergias?: string
+}
+
+export interface HistoriaClinica {
+  id: string
+  paciente_id: string
+  datos: HistoriaClinicaDatos
+  created_at: string
+  updated_at: string
+}
+
+export interface Evolucion {
+  id: string
+  paciente_id: string
+  fecha: string
+  texto: string
+  created_at: string
+}
+
 export interface RecordatorioPendiente {
   turno_id: string
   nombre: string

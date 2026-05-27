@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Search, Plus, Phone, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Search, Plus, Phone, ChevronRight, ArrowLeft, FileText, Printer } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
 import { Paciente, TurnoConPaciente } from '@/lib/types'
+import HistoriaClinicaView from '@/components/admin/HistoriaClinicaView'
 import { formatHora, colorEstadoTurno, labelEstadoTurno, colorEstadoPago, labelEstadoPago, linkWhatsApp, DURACIONES_SEGUIMIENTO } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -26,6 +27,7 @@ export default function PacientesPage() {
   const [modalNuevo, setModalNuevo] = useState(false)
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [verHistoria, setVerHistoria] = useState(false)
 
   const [form, setForm] = useState({
     nombre: '', apellido: '', telefono: '', email: '',
@@ -104,6 +106,16 @@ export default function PacientesPage() {
     }
   }
 
+  // Vista historia clínica
+  if (pacienteDetalle && verHistoria) {
+    return (
+      <HistoriaClinicaView
+        paciente={pacienteDetalle}
+        onBack={() => setVerHistoria(false)}
+      />
+    )
+  }
+
   // Vista detalle de un paciente
   if (pacienteDetalle) {
     return (
@@ -111,7 +123,8 @@ export default function PacientesPage() {
         paciente={pacienteDetalle}
         turnos={turnosPaciente}
         loading={loadingDetalle}
-        onBack={() => setPacienteDetalle(null)}
+        onBack={() => { setPacienteDetalle(null); setVerHistoria(false) }}
+        onVerHistoria={() => setVerHistoria(true)}
         onGuardarNotas={(notas) => guardarNotas(pacienteDetalle, notas)}
       />
     )
@@ -121,10 +134,19 @@ export default function PacientesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Pacientes</h1>
-        <Button onClick={() => setModalNuevo(true)}>
-          <Plus className="w-5 h-5" />
-          Nuevo
-        </Button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.open('/admin/pacientes/imprimir?todos=1', '_blank')}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold text-sm transition-colors"
+          >
+            <Printer className="w-4 h-4" />
+            <span className="hidden sm:inline">Exportar todo</span>
+          </button>
+          <Button onClick={() => setModalNuevo(true)}>
+            <Plus className="w-5 h-5" />
+            Nuevo
+          </Button>
+        </div>
       </div>
 
       <div className="relative">
@@ -234,12 +256,13 @@ export default function PacientesPage() {
 }
 
 function PacienteDetalle({
-  paciente, turnos, loading, onBack, onGuardarNotas
+  paciente, turnos, loading, onBack, onVerHistoria, onGuardarNotas
 }: {
   paciente: Paciente
   turnos: TurnoConPaciente[]
   loading: boolean
   onBack: () => void
+  onVerHistoria: () => void
   onGuardarNotas: (notas: string) => void
 }) {
   const [notas, setNotas] = useState(paciente.notas || '')
@@ -338,6 +361,21 @@ function PacienteDetalle({
           </p>
         )}
       </Card>
+
+      {/* Historia clínica */}
+      <button
+        onClick={onVerHistoria}
+        className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 hover:border-blue-200 hover:shadow-md transition-all text-left"
+      >
+        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+          <FileText className="w-6 h-6 text-blue-600" />
+        </div>
+        <div className="flex-1">
+          <p className="font-bold text-gray-900 text-lg">Historia clínica</p>
+          <p className="text-gray-500 text-sm mt-0.5">Formulario de ingreso y evoluciones</p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+      </button>
 
       {/* Notas privadas */}
       <Card>
