@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Search, Plus, Phone, ChevronRight, ArrowLeft, FileText, Printer } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
@@ -17,7 +18,8 @@ import Textarea from '@/components/ui/Textarea'
 import Modal from '@/components/ui/Modal'
 import Alert from '@/components/ui/Alert'
 
-export default function PacientesPage() {
+function PacientesPageInner() {
+  const searchParams = useSearchParams()
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
@@ -50,6 +52,30 @@ export default function PacientesPage() {
     const timer = setTimeout(cargarPacientes, 300)
     return () => clearTimeout(timer)
   }, [cargarPacientes])
+
+  // Auto-abrir paciente desde URL params (ej: viniendo desde modal de turno)
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    const historia = searchParams.get('historia')
+    if (!openId) return
+    supabase.from('pacientes').select('*').eq('id', openId).single().then(({ data }) => {
+      if (!data) return
+      setPacienteDetalle(data)
+      if (historia === '1') setVerHistoria(true)
+      setLoadingDetalle(true)
+      supabase.from('turnos').select('*, pago:pagos(*)').eq('paciente_id', openId)
+        .order('fecha', { ascending: false }).limit(20)
+        .then(({ data: turnos }) => {
+          setTurnosPaciente(
+            (turnos || []).map(t => ({
+              ...t, paciente: data,
+              pago: Array.isArray(t.pago) ? t.pago[0] : t.pago,
+            })) as TurnoConPaciente[]
+          )
+          setLoadingDetalle(false)
+        })
+    })
+  }, [searchParams])
 
   async function verDetalle(paciente: Paciente) {
     setPacienteDetalle(paciente)
@@ -444,5 +470,13 @@ function PacienteDetalle({
         )}
       </div>
     </div>
+  )
+}
+
+export default function PacientesPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" /></div>}>
+      <PacientesPageInner />
+    </Suspense>
   )
 }

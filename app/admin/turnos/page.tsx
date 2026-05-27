@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { format, parseISO, addDays, addWeeks, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, getDay, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, Clock, Check, X, Edit2, Video, MapPin, Calendar, LayoutList, MessageCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Clock, Check, X, Edit2, Video, MapPin, Calendar, LayoutList, MessageCircle, FileText } from 'lucide-react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { TurnoConPaciente, EstadoTurno, Configuracion, LoteHorario } from '@/lib/types'
 import { formatHora, formatFecha, colorEstadoTurno, labelEstadoTurno, esDiaLaborable, timeToMinutes, minutesToTime, linkWhatsApp, getModalidadPorFecha } from '@/lib/utils'
@@ -678,6 +679,15 @@ export default function TurnosPage() {
               >
                 <MessageCircle className="w-4 h-4" /> Escribir por WhatsApp
               </a>
+            )}
+
+            {turnoAcciones.paciente_id && (
+              <Link
+                href={`/admin/pacientes?open=${turnoAcciones.paciente_id}&historia=1`}
+                className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-800 rounded-xl font-semibold text-sm hover:bg-blue-100 transition-colors"
+              >
+                <FileText className="w-4 h-4" /> Ver historia clínica
+              </Link>
             )}
 
             <Button variant="secondary" onClick={() => setTurnoAcciones(null)}>Cerrar</Button>
