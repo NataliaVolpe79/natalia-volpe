@@ -97,46 +97,62 @@ export interface TurnoOcupado {
 }
 
 export interface HistoriaClinicaDatos {
-  // Datos personales
-  nombre?: string
-  apellido?: string
-  dni?: string
+  // Sección 1: Datos personales
+  apellido_nombres?: string
   fecha_nacimiento?: string
-  domicilio?: string
-  telefono?: string
-  email?: string
-  obra_social?: string
-  numero_afiliado?: string
-  ocupacion?: string
-  escolaridad?: string
+  argentino?: string
+  dni?: string
+  osde_plan?: string
   estado_civil?: string
-  hijos?: string
-  convivencia?: string
-  // Motivo de consulta
+  vive_con?: string
+  domicilio?: string
+  localidad_cp?: string
+  tel_fijo?: string
+  tel_celular?: string
+  educacion?: string
+  contacto_asignado?: string
+  contacto_nombre?: string
+  contacto_parentesco?: string
+  contacto_telefono?: string
+  contacto_convive?: string
+  // Sección 2: Motivo de consulta
   motivo_consulta?: string
-  // Examen semiológico
+  // Sección 3: Examen semiológico
+  aspecto_fisico?: string[]
+  facies?: string
+  actitud?: string
+  presentacion?: string[]
+  presentacion_otros?: string
+  aspecto_psiquico?: string
   conciencia?: string
+  conductas?: Record<string, string[]>
+  orientacion?: Record<string, string>
   atencion?: string
-  memoria?: string
-  orientacion?: string
-  lenguaje?: string
-  pensamiento_curso?: string
-  pensamiento_contenido?: string
-  percepciones?: string
-  afecto?: string
-  conducta?: string
-  critica_insight?: string
-  // Hábitos
+  memoria_sensopercepcion?: Record<string, string[]>
+  tipos_fallas?: Record<string, string[]>
+  pensamiento?: Record<string, string[]>
+  delirio?: Record<string, string[]>
+  afectividad?: string[]
+  actividad?: string[]
+  juicio?: string
+  conciencia_de?: Record<string, string>
+  inteligencia?: string
+  // Sección 4: Hábitos personales
+  conducta_alimentaria?: string
   sueno?: string
-  alimentacion?: string
-  actividad_fisica?: string
-  sustancias?: string
-  // Enfermedad actual
-  antecedentes_personales?: string
-  antecedentes_familiares?: string
-  tratamientos_previos?: string
-  medicacion_actual?: string
-  alergias?: string
+  sexualidad?: string
+  relacion_sustancias?: string
+  agresividad?: string
+  // Sección 5: Enfermedad actual
+  antecedentes_enfermedad?: string
+  antecedentes_psiquiatricos?: string
+  antecedentes_medicos?: string
+  medicacion?: string
+  familigrama?: string
+  diagnostico_presuntivo?: string
+  codigo_dsmiv?: string
+  resolucion?: string[]
+  plan_farmacologico?: string
 }
 
 export interface HistoriaClinica {
