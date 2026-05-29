@@ -7,9 +7,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const FOLDER_NAME = 'Backup Historias Clínicas MVN'
-const SHARE_WITH = 'psiquiatra.nataliavolpe@gmail.com'
-
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -18,8 +15,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    if (!credentialsJson) {
-      return NextResponse.json({ error: 'Missing GOOGLE_SERVICE_ACCOUNT_JSON' }, { status: 500 })
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
+
+    if (!credentialsJson || !folderId) {
+      return NextResponse.json({ error: 'Missing env vars' }, { status: 500 })
     }
 
     const credentials = JSON.parse(credentialsJson)
@@ -29,35 +28,12 @@ export async function GET(req: NextRequest) {
     })
     const drive = google.drive({ version: 'v3', auth: googleAuth })
 
-    // Buscar o crear la carpeta de backup (propiedad de la cuenta de servicio)
-    let folderId: string
-    const search = await drive.files.list({
-      q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id)',
+    // Verificar que la carpeta es accesible
+    await drive.files.get({
+      fileId: folderId,
+      fields: 'id',
+      supportsAllDrives: true,
     })
-
-    if (search.data.files && search.data.files.length > 0) {
-      folderId = search.data.files[0].id!
-    } else {
-      // Crear carpeta nueva y compartirla con la doctora
-      const folder = await drive.files.create({
-        requestBody: {
-          name: FOLDER_NAME,
-          mimeType: 'application/vnd.google-apps.folder',
-        },
-        fields: 'id',
-      })
-      folderId = folder.data.id!
-
-      await drive.permissions.create({
-        fileId: folderId,
-        requestBody: {
-          type: 'user',
-          role: 'writer',
-          emailAddress: SHARE_WITH,
-        },
-      })
-    }
 
     // Obtener todos los datos de Supabase
     const [{ data: pacientes }, { data: historias }, { data: evoluciones }] = await Promise.all([
@@ -91,6 +67,7 @@ export async function GET(req: NextRequest) {
         body: contenido,
       },
       fields: 'id, name',
+      supportsAllDrives: true,
     })
 
     return NextResponse.json({
