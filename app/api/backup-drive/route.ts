@@ -25,11 +25,11 @@ export async function GET(req: NextRequest) {
     const credentials = JSON.parse(credentialsJson)
 
     // Autenticar con Google
-    const auth = new google.auth.GoogleAuth({
+    const googleAuth = new google.auth.GoogleAuth({
       credentials,
       scopes: ['https://www.googleapis.com/auth/drive.file'],
     })
-    const drive = google.drive({ version: 'v3', auth })
+    const drive = google.drive({ version: 'v3', auth: googleAuth })
 
     // Obtener todos los datos de Supabase
     const [{ data: pacientes }, { data: historias }, { data: evoluciones }] = await Promise.all([
