@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()
 
     if (!credentialsJson || !folderId) {
       return NextResponse.json({ error: 'Missing env vars' }, { status: 500 })
