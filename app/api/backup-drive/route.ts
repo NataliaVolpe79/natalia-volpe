@@ -14,26 +14,19 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()
-
-    if (!credentialsJson || !folderId) {
+    if (!folderId || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_DRIVE_REFRESH_TOKEN) {
       return NextResponse.json({ error: 'Missing env vars' }, { status: 500 })
     }
 
-    const credentials = JSON.parse(credentialsJson)
-    const googleAuth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    })
-    const drive = google.drive({ version: 'v3', auth: googleAuth })
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      'https://natalia-volpe.vercel.app/api/auth-drive/callback'
+    )
+    oauth2Client.setCredentials({ refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN })
 
-    // Verificar que la carpeta es accesible
-    await drive.files.get({
-      fileId: folderId,
-      fields: 'id',
-      supportsAllDrives: true,
-    })
+    const drive = google.drive({ version: 'v3', auth: oauth2Client })
 
     // Obtener todos los datos de Supabase
     const [{ data: pacientes }, { data: historias }, { data: evoluciones }] = await Promise.all([
@@ -67,7 +60,6 @@ export async function GET(req: NextRequest) {
         body: contenido,
       },
       fields: 'id, name',
-      supportsAllDrives: true,
     })
 
     return NextResponse.json({
