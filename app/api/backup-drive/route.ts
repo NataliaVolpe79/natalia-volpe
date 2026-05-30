@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
 
           const datos = historia?.datos || {}
           const pdfBuffer = await pdf(
-            React.createElement(HistoriaPDF, { paciente: p, datos, evoluciones: evos, fecha })
+            React.createElement(HistoriaPDF, { paciente: p, datos, evoluciones: evos, fecha }) as React.ReactElement<any>
           ).toBuffer()
 
           await uploadPDF(drive, 'historia-clinica.pdf', patientFolderId, Buffer.from(pdfBuffer))
