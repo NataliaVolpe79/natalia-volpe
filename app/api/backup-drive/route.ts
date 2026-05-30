@@ -116,7 +116,8 @@ export async function GET(req: NextRequest) {
 
           await uploadPDF(drive, 'historia-clinica.pdf', patientFolderId, pdfBuffer)
           ok++
-        } catch {
+        } catch (e) {
+          console.error('Error paciente', p.id, p.apellido, e)
           errors++
         }
       }))
