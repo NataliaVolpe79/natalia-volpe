@@ -111,9 +111,9 @@ export async function GET(req: NextRequest) {
           const patientFolderId = await getOrCreateFolder(drive, folderName, mainFolderId)
 
           const datos = historia?.datos || {}
-          const pdfBuffer = await pdf(
-            React.createElement(HistoriaPDF, { paciente: p, datos, evoluciones: evos, fecha }) as React.ReactElement<any>
-          ).toBuffer()
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const element = React.createElement(HistoriaPDF, { paciente: p, datos, evoluciones: evos, fecha }) as React.ReactElement<Record<string, unknown>>
+          const pdfBuffer = await pdf(element as Parameters<typeof pdf>[0]).toBuffer()
 
           await uploadPDF(drive, 'historia-clinica.pdf', patientFolderId, Buffer.from(pdfBuffer))
           ok++
