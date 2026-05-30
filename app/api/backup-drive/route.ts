@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Readable } from 'stream'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 import { pdf } from '@react-pdf/renderer'
@@ -46,7 +47,6 @@ async function uploadPDF(
     pageSize: 1,
   })
 
-  const { Readable } = await import('stream')
   const stream = Readable.from(buffer)
 
   if (res.data.files && res.data.files.length > 0) {
