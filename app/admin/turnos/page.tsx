@@ -50,6 +50,7 @@ export default function TurnosPage() {
   const [mensajeCancelar, setMensajeCancelar] = useState('')
   const [linksWA, setLinksWA] = useState<{ nombre: string; url: string }[]>([])
   const [turnoAcciones, setTurnoAcciones] = useState<TurnoConPaciente | null>(null)
+  const [turnoModificar, setTurnoModificar] = useState<TurnoConPaciente | null>(null)
 
   const cargarConfig = useCallback(async () => {
     const { data } = await supabase.from('configuracion').select('*').single()
@@ -351,6 +352,10 @@ export default function TurnosPage() {
             <button onClick={() => cambiarEstado(turno.id, 'completado')}
               className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-100">
               <Check className="w-3.5 h-3.5" /> Completado
+            </button>
+            <button onClick={() => setTurnoModificar(turno)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100">
+              <Calendar className="w-3.5 h-3.5" /> Modificar
             </button>
             <button onClick={() => { setTurnoEditar(turno); setNotasEditar(turno.notas || '') }}
               className="flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200">
@@ -660,6 +665,15 @@ export default function TurnosPage() {
                 </button>
                 <button
                   onClick={() => {
+                    setTurnoModificar(turnoAcciones)
+                    setTurnoAcciones(null)
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-semibold text-sm hover:bg-blue-100 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" /> Modificar turno
+                </button>
+                <button
+                  onClick={() => {
                     setTurnoAcciones(null)
                     iniciarCancelTurno(turnoAcciones)
                   }}
@@ -694,6 +708,21 @@ export default function TurnosPage() {
           </div>
         )}
       </Modal>
+
+      {turnoModificar && (
+        <FormularioTurno
+          isOpen={!!turnoModificar}
+          onClose={() => setTurnoModificar(null)}
+          onSuccess={() => {
+            setTurnoModificar(null)
+            cargarTurnosSemana(fechaRef)
+            cargarTurnosDia(fechaSeleccionada)
+            if (vista === 'mes') cargarDiasConTurnosMes(fechaRef)
+          }}
+          config={config}
+          turnoExistente={turnoModificar}
+        />
+      )}
 
       <Modal isOpen={!!turnoEditar} onClose={() => setTurnoEditar(null)} title="Editar notas del turno">
         <div className="flex flex-col gap-4">

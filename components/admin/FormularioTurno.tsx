@@ -9,7 +9,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Alert from '@/components/ui/Alert'
 import { supabase } from '@/lib/supabase'
-import { Configuracion, LoteHorario, Paciente, TipoTurno } from '@/lib/types'
+import { Configuracion, LoteHorario, Paciente, TipoTurno, TurnoConPaciente } from '@/lib/types'
 import {
   calcularHorariosEnLotes,
   getModalidadPorFecha,
@@ -24,33 +24,34 @@ interface Props {
   config: Configuracion | null
   fechaInicial?: string
   horaInicial?: string
+  turnoExistente?: TurnoConPaciente
 }
 
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 
-export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fechaInicial, horaInicial }: Props) {
-  const [paso, setPaso] = useState<'paciente' | 'tipo' | 'fecha' | 'hora'>('paciente')
+export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fechaInicial, horaInicial, turnoExistente }: Props) {
+  const [paso, setPaso] = useState<'paciente' | 'tipo' | 'fecha' | 'hora'>(turnoExistente ? 'tipo' : 'paciente')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   // Paciente
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<Paciente[]>([])
-  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null)
+  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(turnoExistente?.paciente || null)
   const [creandoPaciente, setCreandoPaciente] = useState(false)
   const [nuevoPaciente, setNuevoPaciente] = useState({ nombre: '', apellido: '', telefono: '', obra_social: 'OSDE' as 'OSDE' | 'Particular' })
 
   // Tipo de turno y duración
-  const [tipoTurno, setTipoTurno] = useState<TipoTurno>('seguimiento')
-  const [duracionManual, setDuracionManual] = useState<number | null>(null)
+  const [tipoTurno, setTipoTurno] = useState<TipoTurno>(turnoExistente?.tipo_turno || 'seguimiento')
+  const [duracionManual, setDuracionManual] = useState<number | null>(turnoExistente?.duracion_minutos || null)
 
   // Fecha y hora
-  const [mesActual, setMesActual] = useState(new Date())
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaInicial || '')
-  const [horaSeleccionada, setHoraSeleccionada] = useState(horaInicial || '')
+  const [mesActual, setMesActual] = useState(() => turnoExistente ? parseISO(turnoExistente.fecha) : new Date())
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(turnoExistente?.fecha || fechaInicial || '')
+  const [horaSeleccionada, setHoraSeleccionada] = useState(turnoExistente ? '' : (horaInicial || ''))
   const [horarios, setHorarios] = useState<{ hora: string; disponible: boolean }[]>([])
   const [modalidad, setModalidad] = useState<'presencial' | 'videollamada'>('videollamada')
-  const [notas, setNotas] = useState('')
+  const [notas, setNotas] = useState(turnoExistente?.notas || '')
 
   // Duracion efectiva
   const duracionEfectiva = (): number => {
@@ -82,10 +83,13 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
       const mod = getModalidadPorFecha(fecha, config)
       setModalidad(mod)
 
+      let turnosQuery = supabase.from('turnos').select('hora, duracion_minutos')
+        .eq('fecha', fecha).in('estado', ['pendiente', 'confirmado'])
+      if (turnoExistente) turnosQuery = turnosQuery.neq('id', turnoExistente.id)
+
       const [{ data: lotesData }, { data: turnosData }] = await Promise.all([
         supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden'),
-        supabase.from('turnos').select('hora, duracion_minutos')
-          .eq('fecha', fecha).in('estado', ['pendiente', 'confirmado']),
+        turnosQuery,
       ])
 
       const ocupados = (turnosData || []).map((t: { hora: string; duracion_minutos: number }) => ({
@@ -161,17 +165,29 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
     setLoading(true)
     setError('')
     try {
-      const { error: e } = await supabase.from('turnos').insert({
-        paciente_id: pacienteSeleccionado.id,
-        fecha: fechaSeleccionada,
-        hora: horaSeleccionada,
-        duracion_minutos: duracionEfectiva(),
-        modalidad,
-        estado: 'confirmado',
-        tipo_turno: tipoTurno,
-        notas: notas || null,
-      })
-      if (e) throw e
+      if (turnoExistente) {
+        const { error: e } = await supabase.from('turnos').update({
+          fecha: fechaSeleccionada,
+          hora: horaSeleccionada,
+          duracion_minutos: duracionEfectiva(),
+          modalidad,
+          tipo_turno: tipoTurno,
+          notas: notas || null,
+        }).eq('id', turnoExistente.id)
+        if (e) throw e
+      } else {
+        const { error: e } = await supabase.from('turnos').insert({
+          paciente_id: pacienteSeleccionado.id,
+          fecha: fechaSeleccionada,
+          hora: horaSeleccionada,
+          duracion_minutos: duracionEfectiva(),
+          modalidad,
+          estado: 'confirmado',
+          tipo_turno: tipoTurno,
+          notas: notas || null,
+        })
+        if (e) throw e
+      }
       onSuccess()
     } catch {
       setError('No se pudo guardar el turno. Intentá de nuevo.')
@@ -239,7 +255,7 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Nuevo turno — ${titulos[paso]}`} maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={`${turnoExistente ? 'Editar' : 'Nuevo'} turno — ${titulos[paso]}`} maxWidth="md">
       {error && <Alert type="error" className="mb-4">{error}</Alert>}
 
       {/* ====== PACIENTE ====== */}
@@ -379,8 +395,8 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
           )}
 
           <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => { setPaso('paciente'); setPacienteSeleccionado(null) }}>
-              ← Paciente
+            <Button variant="secondary" onClick={turnoExistente ? onClose : () => { setPaso('paciente'); setPacienteSeleccionado(null) }}>
+              {turnoExistente ? 'Cancelar' : '← Paciente'}
             </Button>
             <Button fullWidth onClick={confirmarTipo}
               disabled={tipoTurno === 'seguimiento' && !duracionManual && !pacienteSeleccionado.duracion_seguimiento_minutos}>
@@ -465,7 +481,7 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
             <Button variant="secondary" onClick={() => setPaso(fechaInicial ? 'tipo' : 'fecha')}>← Atrás</Button>
             <Button fullWidth disabled={!horaSeleccionada} onClick={guardarTurno}
               loading={loading} variant="success">
-              Guardar turno
+              {turnoExistente ? 'Guardar cambios' : 'Guardar turno'}
             </Button>
           </div>
         </div>
