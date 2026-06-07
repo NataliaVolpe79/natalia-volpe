@@ -110,7 +110,7 @@ export default function RecordatoriosPage() {
     // Particular
     const total = config?.valor_consulta_particular
     const mitad = total ? `$${Math.round(total / 2)}` : ''
-    const pagoLinea = mitad ? `\nTransferí ${mitad} al alias *${alias}* antes de la consulta.` : ''
+    const pagoLinea = mitad ? `\nTransferí ${mitad} al alias *${alias}* (que está a nombre de Simon Fernandez) antes de la consulta.` : ''
     if (tipo === '24h') {
       return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${pagoLinea} ¡Hasta mañana!`
     }
