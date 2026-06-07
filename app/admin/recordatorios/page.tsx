@@ -102,9 +102,9 @@ export default function RecordatoriosPage() {
     if (esOsde) {
       const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
       if (tipo === '24h') {
-        return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* antes de la consulta.\nEnviá tu credencial de OSDE antes de la consulta. ¡Hasta mañana!`
+        return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* (que está a nombre de Simon Fernandez) antes de la consulta.\nCompartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ¡Hasta mañana!`
       }
-      return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).\nCopago OSDE: ${copago} al alias *${alias}*. Enviá tu credencial de OSDE antes de la consulta. ¡Nos vemos pronto!`
+      return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).\nCopago OSDE: ${copago} al alias *${alias}* (que está a nombre de Simon Fernandez). Compartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ¡Nos vemos pronto!`
     }
 
     // Particular

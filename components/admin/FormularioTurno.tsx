@@ -468,6 +468,15 @@ export default function FormularioTurno({ isOpen, onClose, onSuccess, config, fe
                 )}
               </div>
             )}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-sm font-semibold text-gray-600 mb-2">O escribí un horario personalizado:</p>
+              <input
+                type="time"
+                value={horaSeleccionada}
+                onChange={e => setHoraSeleccionada(e.target.value)}
+                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
           </div>
 
           <div>
