@@ -241,8 +241,12 @@ export default function TurnosPage() {
       }
 
       const libres = slots.filter(s => !s.turno && !s.esContinuacion).length
+      const horasEnSlots = new Set(slots.map(s => s.hora))
+      const turnosFuera = turnosDelDia
+        .filter(t => !horasEnSlots.has(t.hora.substring(0, 5)))
+        .sort((a, b) => timeToMinutes(a.hora.substring(0, 5)) - timeToMinutes(b.hora.substring(0, 5)))
 
-      return { dia, fechaStr, esPresencial, esHoy, slots, libres }
+      return { dia, fechaStr, esPresencial, esHoy, slots, libres, turnosFuera }
     })
 
     if (columnas.length === 0) {
@@ -256,7 +260,7 @@ export default function TurnosPage() {
     return (
       <div className="overflow-x-auto">
         <div className="flex gap-2" style={{ minWidth: `${columnas.length * 140}px` }}>
-          {columnas.map(({ dia, fechaStr, esPresencial, esHoy, slots, libres }) => (
+          {columnas.map(({ dia, fechaStr, esPresencial, esHoy, slots, libres, turnosFuera }) => (
             <div key={fechaStr} className="flex-1 flex flex-col gap-1.5">
               {/* Encabezado del día */}
               <div className={`text-center p-2.5 rounded-xl ${
@@ -276,8 +280,23 @@ export default function TurnosPage() {
                 </p>
               </div>
 
+              {/* Turnos fuera de horario */}
+              {turnosFuera.map(turno => (
+                <div
+                  key={turno.id}
+                  className="px-2 py-2 bg-orange-100 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-200 transition-colors"
+                  onClick={() => setTurnoAcciones(turno)}
+                >
+                  <p className="text-xs font-bold text-orange-700 leading-none">{turno.hora.substring(0, 5)}</p>
+                  <p className="text-xs text-orange-900 font-semibold truncate mt-0.5 leading-tight">
+                    {turno.paciente?.nombre} {turno.paciente?.apellido?.charAt(0)}.
+                  </p>
+                  <p className="text-[10px] text-orange-600 mt-0.5">{turno.duracion_minutos}min</p>
+                </div>
+              ))}
+
               {/* Slots */}
-              {slots.length === 0 && (
+              {slots.length === 0 && turnosFuera.length === 0 && (
                 <div className="text-center text-xs text-gray-400 py-4">Sin horarios</div>
               )}
               {slots.map(({ hora, turno, esContinuacion }) =>
@@ -374,6 +393,7 @@ export default function TurnosPage() {
   function AgendaDia() {
     const DURACION = 20
     const lotesOrdenados = [...lotes].sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio))
+    const activos = turnosFiltrados(turnos).filter(t => t.estado !== 'cancelado')
     const slots: Array<{ hora: string; turno: TurnoConPaciente | null; esContinuacion: boolean }> = []
 
     for (const lote of lotesOrdenados) {
@@ -381,7 +401,6 @@ export default function TurnosPage() {
       const fin = timeToMinutes(lote.hora_fin)
       while (actual + DURACION <= fin) {
         const horaStr = minutesToTime(actual)
-        const activos = turnosFiltrados(turnos).filter(t => t.estado !== 'cancelado')
         const turnoEnSlot = activos.find(t => t.hora.substring(0, 5) === horaStr) ?? null
         const esContinuacion = !turnoEnSlot && activos.some(t => {
           const tStart = timeToMinutes(t.hora.substring(0, 5))
@@ -392,7 +411,17 @@ export default function TurnosPage() {
       }
     }
 
-    if (slots.length === 0) {
+    const horasEnSlots = new Set(slots.map(s => s.hora))
+    const turnosFuera = activos.filter(t => !horasEnSlots.has(t.hora.substring(0, 5)))
+
+    type ItemSlot = { tipo: 'slot'; hora: string; turno: TurnoConPaciente | null; esContinuacion: boolean }
+    type ItemExtra = { tipo: 'extra'; hora: string; turno: TurnoConPaciente }
+    const items: Array<ItemSlot | ItemExtra> = [
+      ...slots.map(s => ({ tipo: 'slot' as const, hora: s.hora, turno: s.turno, esContinuacion: s.esContinuacion })),
+      ...turnosFuera.map(t => ({ tipo: 'extra' as const, hora: t.hora.substring(0, 5), turno: t })),
+    ].sort((a, b) => timeToMinutes(a.hora) - timeToMinutes(b.hora))
+
+    if (items.length === 0) {
       return (
         <Card className="text-center py-8">
           <p className="text-gray-500">No hay horarios configurados para este día</p>
@@ -402,24 +431,26 @@ export default function TurnosPage() {
 
     return (
       <div className="flex flex-col gap-2">
-        {slots.map(({ hora, turno, esContinuacion }) =>
-          turno ? (
-            <TarjetaTurno key={hora} turno={turno} />
-          ) : esContinuacion ? (
-            <div key={hora} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+        {items.map(item =>
+          item.tipo === 'extra' ? (
+            <TarjetaTurno key={item.turno.id} turno={item.turno} />
+          ) : item.turno ? (
+            <TarjetaTurno key={item.hora} turno={item.turno} />
+          ) : item.esContinuacion ? (
+            <div key={item.hora} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
               <div className="w-12 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-gray-400">{hora}</span>
+                <span className="text-xs font-bold text-gray-400">{item.hora}</span>
               </div>
               <span className="text-gray-400 text-sm">Ocupado</span>
             </div>
           ) : (
-            <div key={hora} className="flex items-center gap-3 px-3 py-2.5 bg-green-50 rounded-xl border border-green-100">
+            <div key={item.hora} className="flex items-center gap-3 px-3 py-2.5 bg-green-50 rounded-xl border border-green-100">
               <div className="w-12 h-10 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-green-700">{hora}</span>
+                <span className="text-xs font-bold text-green-700">{item.hora}</span>
               </div>
               <span className="text-green-700 font-semibold text-sm flex-1">Disponible</span>
               <button
-                onClick={() => { setHoraSlot(hora); setModalNuevoTurno(true) }}
+                onClick={() => { setHoraSlot(item.hora); setModalNuevoTurno(true) }}
                 className="text-xs text-green-600 font-bold hover:text-green-800 px-2 py-1 rounded-lg hover:bg-green-100"
               >
                 + Asignar
