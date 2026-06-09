@@ -233,7 +233,7 @@ export default function SacarTurnoPage() {
         estado: 'pendiente',
         tipo_turno: esPrimeraTurno ? 'primera_consulta' : 'seguimiento',
       })
-      if (e) throw new Error('No se pudo reservar el turno')
+      if (e) throw new Error(`No se pudo reservar el turno: ${e.message} (${e.code})`)
       setPaso(4)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Hubo un error. Intentá de nuevo.')
