@@ -381,7 +381,7 @@ export default function MisTurnosPage() {
                           </div>
                           <div className="flex items-center gap-2 text-gray-500">
                             {turno.modalidad === 'presencial'
-                              ? <><MapPin className="w-5 h-5 shrink-0" /><span>Presencial</span></>
+                              ? <><MapPin className="w-5 h-5 shrink-0" /><span>Presencial · Av. Rivadavia 5012</span></>
                               : <><Video className="w-5 h-5 shrink-0" /><span>Videollamada</span></>
                             }
                           </div>

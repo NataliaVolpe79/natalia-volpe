@@ -750,12 +750,18 @@ export default function SacarTurnoPage() {
                   <span className="text-gray-500">Hora</span>
                   <span className="font-bold text-gray-900 text-lg">{formatHora(horaSeleccionada)} hs</span>
                 </div>
-                <div className="flex justify-between items-center py-3">
+                <div className={`flex justify-between items-center py-3 ${modalidad === 'presencial' ? 'border-b border-gray-100' : ''}`}>
                   <span className="text-gray-500">Modalidad</span>
                   <span className="font-bold text-gray-900 text-lg">
                     {modalidad === 'presencial' ? '📍 Presencial' : '💻 Videollamada'}
                   </span>
                 </div>
+                {modalidad === 'presencial' && (
+                  <div className="flex justify-between items-center py-3">
+                    <span className="text-gray-500">Dirección</span>
+                    <span className="font-bold text-gray-900 text-lg">Av. Rivadavia 5012</span>
+                  </div>
+                )}
               </div>
 
               <Alert type="info">
