@@ -280,63 +280,65 @@ export default function TurnosPage() {
                 </p>
               </div>
 
-              {/* Turnos fuera de horario */}
-              {turnosFuera.map(turno => (
-                <div
-                  key={turno.id}
-                  className="px-2 py-2 bg-orange-100 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-200 transition-colors"
-                  onClick={() => setTurnoAcciones(turno)}
-                >
-                  <p className="text-xs font-bold text-orange-700 leading-none">{turno.hora.substring(0, 5)}</p>
-                  <p className="text-xs text-orange-900 font-semibold truncate mt-0.5 leading-tight">
-                    {turno.paciente?.nombre} {turno.paciente?.apellido?.charAt(0)}.
-                  </p>
-                  <p className="text-[10px] text-orange-600 mt-0.5">{turno.duracion_minutos}min</p>
-                </div>
-              ))}
-
-              {/* Slots */}
+              {/* Slots + turnos fuera de horario mezclados y ordenados */}
               {slots.length === 0 && turnosFuera.length === 0 && (
                 <div className="text-center text-xs text-gray-400 py-4">Sin horarios</div>
               )}
-              {slots.map(({ hora, turno, esContinuacion }) =>
-                turno ? (
+              {[
+                ...slots.map(s => ({ tipo: 'slot' as const, hora: s.hora, turno: s.turno, esContinuacion: s.esContinuacion })),
+                ...turnosFuera.map(t => ({ tipo: 'extra' as const, hora: t.hora.substring(0, 5), turno: t, esContinuacion: false })),
+              ]
+                .sort((a, b) => timeToMinutes(a.hora) - timeToMinutes(b.hora))
+                .map(item =>
+                item.tipo === 'extra' ? (
                   <div
-                    key={hora}
+                    key={item.turno.id}
+                    className="px-2 py-2 bg-orange-100 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-200 transition-colors"
+                    onClick={() => setTurnoAcciones(item.turno)}
+                  >
+                    <p className="text-xs font-bold text-orange-700 leading-none">{item.hora}</p>
+                    <p className="text-xs text-orange-900 font-semibold truncate mt-0.5 leading-tight">
+                      {item.turno.paciente?.nombre} {item.turno.paciente?.apellido?.charAt(0)}.
+                    </p>
+                    <p className="text-[10px] text-orange-600 mt-0.5">{item.turno.duracion_minutos}min</p>
+                  </div>
+                ) : item.turno ? (
+                  <div
+                    key={item.hora}
                     className={`px-2 py-2 rounded-lg cursor-pointer transition-colors border ${
-                      turno.estado === 'completado'
+                      item.turno.estado === 'completado'
                         ? 'bg-green-50 border-green-200 hover:bg-green-100'
-                        : turno.estado === 'cancelado'
+                        : item.turno.estado === 'cancelado'
                         ? 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                         : 'bg-blue-100 border-blue-200 hover:bg-blue-200'
                     }`}
-                    onClick={() => setTurnoAcciones(turno)}
+                    onClick={() => setTurnoAcciones(item.turno!)}
                   >
-                    <p className={`text-xs font-bold leading-none ${turno.estado === 'completado' ? 'text-green-700' : turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-700'}`}>{hora}</p>
-                    <p className={`text-xs font-semibold truncate mt-0.5 leading-tight ${turno.estado === 'cancelado' ? 'text-gray-400 line-through' : 'text-blue-900'}`}>
-                      {turno.paciente?.nombre} {turno.paciente?.apellido}
+                    <p className={`text-xs font-bold leading-none ${item.turno.estado === 'completado' ? 'text-green-700' : item.turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-700'}`}>{item.hora}</p>
+                    <p className={`text-xs font-semibold truncate mt-0.5 leading-tight ${item.turno.estado === 'cancelado' ? 'text-gray-400 line-through' : 'text-blue-900'}`}>
+                      {item.turno.paciente?.nombre} {item.turno.paciente?.apellido}
                     </p>
-                    <p className={`text-[10px] mt-0.5 ${turno.estado === 'completado' ? 'text-green-600' : turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-600'}`}>{turno.duracion_minutos}min</p>
+                    <p className={`text-[10px] mt-0.5 ${item.turno.estado === 'completado' ? 'text-green-600' : item.turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-600'}`}>{item.turno.duracion_minutos}min</p>
                   </div>
-                ) : esContinuacion ? (
+                ) : item.esContinuacion ? (
                   <div
-                    key={hora}
+                    key={item.hora}
                     className="px-2 py-2 bg-gray-100 border border-gray-200 rounded-lg"
                   >
-                    <p className="text-xs font-bold text-gray-400 leading-none">{hora}</p>
+                    <p className="text-xs font-bold text-gray-400 leading-none">{item.hora}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">ocupado</p>
                   </div>
                 ) : (
                   <button
-                    key={hora}
+                    key={item.hora}
                     className="px-2 py-2 bg-green-50 border border-dashed border-green-200 rounded-lg hover:bg-green-100 hover:border-green-400 transition-all text-left group"
                     onClick={() => {
                       setFechaSeleccionada(fechaStr)
-                      setHoraSlot(hora)
+                      setHoraSlot(item.hora)
                       setModalNuevoTurno(true)
                     }}
                   >
-                    <p className="text-xs font-bold text-green-700 leading-none">{hora}</p>
+                    <p className="text-xs font-bold text-green-700 leading-none">{item.hora}</p>
                     <p className="text-[10px] text-green-500 group-hover:text-green-700 mt-0.5">+ Asignar</p>
                   </button>
                 )
