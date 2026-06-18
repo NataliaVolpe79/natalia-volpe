@@ -562,7 +562,7 @@ export default function ConfiguracionPage() {
               '2026-06-20','2026-07-09','2026-07-10','2026-08-17','2026-10-12',
               '2026-11-23','2026-12-07','2026-12-08','2026-12-25',
             ]
-            const fusionados = [...new Set([...config.feriados, ...f2026])].sort()
+            const fusionados = Array.from(new Set([...config.feriados, ...f2026])).sort()
             setConfig({ ...config, feriados: fusionados })
           }}
           className="flex items-center gap-2 px-4 py-2.5 mb-4 bg-blue-50 text-blue-700 rounded-xl font-semibold text-sm hover:bg-blue-100 transition-colors"
