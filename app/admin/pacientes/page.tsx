@@ -243,8 +243,18 @@ function PacientesPageInner() {
           <Input label="Fecha de nacimiento" value={form.fecha_nacimiento} type="date"
             onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Obra social" value={form.obra_social}
-              onChange={e => setForm(f => ({ ...f, obra_social: e.target.value }))} />
+            <div>
+              <label className="text-base font-semibold text-gray-700 block mb-1.5">Obra social</label>
+              <select
+                value={form.obra_social}
+                onChange={e => setForm(f => ({ ...f, obra_social: e.target.value }))}
+                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+              >
+                <option value="">Sin obra social</option>
+                <option value="OSDE">OSDE</option>
+                <option value="Particular">Particular</option>
+              </select>
+            </div>
             <Input label="N° afiliado" value={form.numero_afiliado}
               onChange={e => setForm(f => ({ ...f, numero_afiliado: e.target.value }))} />
           </div>
@@ -439,8 +449,18 @@ function PacienteDetalle({
               onChange={e => setEditForm(f => ({ ...f, dni: e.target.value }))} />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Obra social" value={editForm.obra_social}
-              onChange={e => setEditForm(f => ({ ...f, obra_social: e.target.value }))} />
+            <div>
+              <label className="text-base font-semibold text-gray-700 block mb-1.5">Obra social</label>
+              <select
+                value={editForm.obra_social}
+                onChange={e => setEditForm(f => ({ ...f, obra_social: e.target.value }))}
+                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+              >
+                <option value="">Sin obra social</option>
+                <option value="OSDE">OSDE</option>
+                <option value="Particular">Particular</option>
+              </select>
+            </div>
             <Input label="N° afiliado" value={editForm.numero_afiliado}
               onChange={e => setEditForm(f => ({ ...f, numero_afiliado: e.target.value }))} />
           </div>
