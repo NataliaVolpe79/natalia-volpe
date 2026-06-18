@@ -553,24 +553,7 @@ export default function ConfiguracionPage() {
         <h2 className="text-lg font-bold text-gray-900 mb-1">Feriados y días sin atención</h2>
         <p className="text-sm text-gray-500 mb-4">Estos días quedan bloqueados en el portal de turnos.</p>
 
-        {/* Cargar feriados 2026 */}
-        <button
-          onClick={() => {
-            const f2026 = [
-              '2026-01-01','2026-02-16','2026-02-17','2026-03-23','2026-03-24',
-              '2026-04-02','2026-04-03','2026-05-01','2026-05-25','2026-06-15',
-              '2026-06-20','2026-07-09','2026-07-10','2026-08-17','2026-10-12',
-              '2026-11-23','2026-12-07','2026-12-08','2026-12-25',
-            ]
-            const fusionados = Array.from(new Set([...config.feriados, ...f2026])).sort()
-            setConfig({ ...config, feriados: fusionados })
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 mb-4 bg-blue-50 text-blue-700 rounded-xl font-semibold text-sm hover:bg-blue-100 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Cargar feriados 2026 (fuente: La Nacion)
-        </button>
-
-        <div className="flex gap-3 mb-4">
+<div className="flex gap-3 mb-4">
           <input type="date" value={nuevoFeriado}
             onChange={e => setNuevoFeriado(e.target.value)}
             className="flex-1 px-4 py-3 text-lg border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400" />
