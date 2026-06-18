@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Search, Plus, Phone, ChevronRight, ArrowLeft, FileText, Printer } from 'lucide-react'
+import { Search, Plus, Phone, ChevronRight, ArrowLeft, FileText, Printer, Edit2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
@@ -152,6 +152,7 @@ function PacientesPageInner() {
         onBack={() => { setPacienteDetalle(null); setVerHistoria(false) }}
         onVerHistoria={() => setVerHistoria(true)}
         onGuardarNotas={(notas) => guardarNotas(pacienteDetalle, notas)}
+        onActualizarPaciente={(p) => { setPacienteDetalle(p); cargarPacientes() }}
       />
     )
   }
@@ -282,7 +283,7 @@ function PacientesPageInner() {
 }
 
 function PacienteDetalle({
-  paciente, turnos, loading, onBack, onVerHistoria, onGuardarNotas
+  paciente, turnos, loading, onBack, onVerHistoria, onGuardarNotas, onActualizarPaciente
 }: {
   paciente: Paciente
   turnos: TurnoConPaciente[]
@@ -290,17 +291,59 @@ function PacienteDetalle({
   onBack: () => void
   onVerHistoria: () => void
   onGuardarNotas: (notas: string) => void
+  onActualizarPaciente: (p: Paciente) => void
 }) {
   const [notas, setNotas] = useState(paciente.notas || '')
   const [editandoNotas, setEditandoNotas] = useState(false)
   const [duracion, setDuracion] = useState(paciente.duracion_seguimiento_minutos ?? null)
   const [guardandoDuracion, setGuardandoDuracion] = useState(false)
+  const [modalEditDatos, setModalEditDatos] = useState(false)
+  const [guardandoEdit, setGuardandoEdit] = useState(false)
+  const [errorEdit, setErrorEdit] = useState('')
+  const [editForm, setEditForm] = useState({
+    nombre: paciente.nombre,
+    apellido: paciente.apellido,
+    telefono: paciente.telefono,
+    email: paciente.email || '',
+    fecha_nacimiento: paciente.fecha_nacimiento || '',
+    dni: paciente.dni || '',
+    obra_social: paciente.obra_social || '',
+    numero_afiliado: paciente.numero_afiliado || '',
+  })
 
   async function guardarDuracion(nuevaDuracion: number | null) {
     setGuardandoDuracion(true)
     await supabase.from('pacientes').update({ duracion_seguimiento_minutos: nuevaDuracion }).eq('id', paciente.id)
     setDuracion(nuevaDuracion)
     setGuardandoDuracion(false)
+  }
+
+  async function guardarEditDatos() {
+    if (!editForm.nombre.trim() || !editForm.apellido.trim() || !editForm.telefono.trim()) {
+      setErrorEdit('Nombre, apellido y teléfono son obligatorios')
+      return
+    }
+    setGuardandoEdit(true)
+    setErrorEdit('')
+    try {
+      const { data, error: e } = await supabase.from('pacientes').update({
+        nombre: editForm.nombre.trim(),
+        apellido: editForm.apellido.trim(),
+        telefono: editForm.telefono.replace(/\D/g, ''),
+        email: editForm.email || null,
+        fecha_nacimiento: editForm.fecha_nacimiento || null,
+        dni: editForm.dni || null,
+        obra_social: editForm.obra_social || null,
+        numero_afiliado: editForm.numero_afiliado || null,
+      }).eq('id', paciente.id).select().single()
+      if (e) throw e
+      setModalEditDatos(false)
+      onActualizarPaciente(data as Paciente)
+    } catch {
+      setErrorEdit('No se pudo guardar los datos')
+    } finally {
+      setGuardandoEdit(false)
+    }
   }
 
   return (
@@ -316,18 +359,42 @@ function PacienteDetalle({
 
       {/* Datos del paciente */}
       <Card>
-        <div className="flex items-center gap-4 mb-5">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-blue-700 font-bold text-2xl">{paciente.nombre[0]}{paciente.apellido[0]}</span>
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-blue-700 font-bold text-2xl">{paciente.nombre[0]}{paciente.apellido[0]}</span>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-gray-900">{paciente.nombre} {paciente.apellido}</p>
+              {paciente.fecha_nacimiento && (
+                <p className="text-gray-500">
+                  Nacido/a el {format(parseISO(paciente.fecha_nacimiento), "d 'de' MMMM 'de' yyyy", { locale: es })}
+                </p>
+              )}
+              {paciente.dni && (
+                <p className="text-gray-500">DNI: {paciente.dni}</p>
+              )}
+            </div>
           </div>
-          <div>
-            <p className="text-xl font-bold text-gray-900">{paciente.nombre} {paciente.apellido}</p>
-            {paciente.fecha_nacimiento && (
-              <p className="text-gray-500">
-                Nacido/a el {format(parseISO(paciente.fecha_nacimiento), "d 'de' MMMM 'de' yyyy", { locale: es })}
-              </p>
-            )}
-          </div>
+          <button
+            onClick={() => {
+              setEditForm({
+                nombre: paciente.nombre,
+                apellido: paciente.apellido,
+                telefono: paciente.telefono,
+                email: paciente.email || '',
+                fecha_nacimiento: paciente.fecha_nacimiento || '',
+                dni: paciente.dni || '',
+                obra_social: paciente.obra_social || '',
+                numero_afiliado: paciente.numero_afiliado || '',
+              })
+              setErrorEdit('')
+              setModalEditDatos(true)
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-colors shrink-0"
+          >
+            <Edit2 className="w-4 h-4" /> Editar
+          </button>
         </div>
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -352,6 +419,37 @@ function PacienteDetalle({
           )}
         </div>
       </Card>
+
+      {/* Modal editar datos */}
+      <Modal isOpen={modalEditDatos} onClose={() => setModalEditDatos(false)} title="Editar datos del paciente" maxWidth="md">
+        {errorEdit && <Alert type="error" className="mb-4">{errorEdit}</Alert>}
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Nombre *" value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))} />
+            <Input label="Apellido *" value={editForm.apellido} onChange={e => setEditForm(f => ({ ...f, apellido: e.target.value }))} />
+          </div>
+          <Input label="Teléfono *" type="tel" value={editForm.telefono} hint="Sin el 15, solo números"
+            onChange={e => setEditForm(f => ({ ...f, telefono: e.target.value }))} />
+          <Input label="Email" type="email" value={editForm.email}
+            onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Fecha de nacimiento" type="date" value={editForm.fecha_nacimiento}
+              onChange={e => setEditForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
+            <Input label="DNI" value={editForm.dni}
+              onChange={e => setEditForm(f => ({ ...f, dni: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Obra social" value={editForm.obra_social}
+              onChange={e => setEditForm(f => ({ ...f, obra_social: e.target.value }))} />
+            <Input label="N° afiliado" value={editForm.numero_afiliado}
+              onChange={e => setEditForm(f => ({ ...f, numero_afiliado: e.target.value }))} />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth onClick={() => setModalEditDatos(false)}>Cancelar</Button>
+            <Button fullWidth onClick={guardarEditDatos} loading={guardandoEdit}>Guardar</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Duración de consulta */}
       <Card>
