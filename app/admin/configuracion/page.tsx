@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { format } from 'date-fns'
 import { Plus, Trash2, Save, Settings, Clock, Edit2, X, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { Configuracion, LoteHorario } from '@/lib/types'
+import { Bloqueo, Configuracion, LoteHorario } from '@/lib/types'
 import { timeToMinutes } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -37,6 +37,9 @@ export default function ConfiguracionPage() {
   const [error, setError] = useState('')
   const [diaActivo, setDiaActivo] = useState('lunes')
   const [nuevoFeriado, setNuevoFeriado] = useState('')
+  const [bloqueos, setBloqueos] = useState<Bloqueo[]>([])
+  const [nuevoBloqueo, setNuevoBloqueo] = useState({ fecha: '', hora_inicio: '09:00', hora_fin: '10:00', motivo: '' })
+  const [guardandoBloqueo, setGuardandoBloqueo] = useState(false)
 
   // Formulario para nuevo lote
   const [mostrarFormLote, setMostrarFormLote] = useState(false)
@@ -53,12 +56,14 @@ export default function ConfiguracionPage() {
 
   const cargarDatos = useCallback(async () => {
     setLoading(true)
-    const [{ data: cfg }, { data: lotesData }] = await Promise.all([
+    const [{ data: cfg }, { data: lotesData }, { data: bloqueosData }] = await Promise.all([
       supabase.from('configuracion').select('*').single(),
       supabase.from('lotes_horarios').select('*').order('dia').order('orden'),
+      supabase.from('bloqueos').select('*').order('fecha').order('hora_inicio'),
     ])
     if (cfg) setConfig(cfg)
     setLotes(lotesData || [])
+    setBloqueos((bloqueosData || []) as Bloqueo[])
     setLoading(false)
   }, [])
 
@@ -231,6 +236,37 @@ export default function ConfiguracionPage() {
     if (form.horarios_primera_consulta.includes(nueva)) return
     setForm({ ...form, horarios_primera_consulta: [...form.horarios_primera_consulta, nueva].sort() })
     setError('')
+  }
+
+  async function agregarBloqueo() {
+    if (!nuevoBloqueo.fecha || !nuevoBloqueo.hora_inicio || !nuevoBloqueo.hora_fin) return
+    if (nuevoBloqueo.hora_fin <= nuevoBloqueo.hora_inicio) {
+      setError('La hora de fin debe ser mayor que la de inicio')
+      return
+    }
+    setGuardandoBloqueo(true)
+    setError('')
+    try {
+      const { data, error: e } = await supabase.from('bloqueos').insert({
+        fecha: nuevoBloqueo.fecha,
+        hora_inicio: nuevoBloqueo.hora_inicio,
+        hora_fin: nuevoBloqueo.hora_fin,
+        motivo: nuevoBloqueo.motivo || null,
+      }).select().single()
+      if (e) throw e
+      setBloqueos(prev => [...prev, data as Bloqueo].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora_inicio.localeCompare(b.hora_inicio)))
+      setNuevoBloqueo({ fecha: '', hora_inicio: '09:00', hora_fin: '10:00', motivo: '' })
+    } catch {
+      setError('No se pudo guardar el bloqueo')
+    } finally {
+      setGuardandoBloqueo(false)
+    }
+  }
+
+  async function eliminarBloqueo(id: string) {
+    const { error: e } = await supabase.from('bloqueos').delete().eq('id', id)
+    if (e) setError('No se pudo eliminar el bloqueo')
+    else setBloqueos(prev => prev.filter(b => b.id !== id))
   }
 
   if (loading) {
@@ -581,6 +617,64 @@ export default function ConfiguracionPage() {
         <Button variant="success" className="mt-4 w-full sm:w-auto" onClick={guardarConfig} loading={guardando}>
           <Save className="w-5 h-5" /> Guardar feriados
         </Button>
+      </Card>
+      {/* ============ SECCIÓN 5: Bloqueos de horario ============ */}
+      <Card>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Bloqueos de horario</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Bloqueá un rango de horas en un día específico. Los pacientes no podrán reservar en ese horario.
+        </p>
+
+        {/* Formulario nuevo bloqueo */}
+        <div className="flex flex-col gap-3 mb-4 p-4 bg-gray-50 rounded-xl">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Fecha" type="date" value={nuevoBloqueo.fecha}
+              onChange={e => setNuevoBloqueo(b => ({ ...b, fecha: e.target.value }))} />
+            <Input label="Motivo (opcional)" value={nuevoBloqueo.motivo}
+              placeholder="Ej: Reunión"
+              onChange={e => setNuevoBloqueo(b => ({ ...b, motivo: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Desde" type="time" value={nuevoBloqueo.hora_inicio}
+              onChange={e => setNuevoBloqueo(b => ({ ...b, hora_inicio: e.target.value }))} />
+            <Input label="Hasta" type="time" value={nuevoBloqueo.hora_fin}
+              onChange={e => setNuevoBloqueo(b => ({ ...b, hora_fin: e.target.value }))} />
+          </div>
+          <Button
+            onClick={agregarBloqueo}
+            loading={guardandoBloqueo}
+            disabled={!nuevoBloqueo.fecha}
+            variant="success"
+            className="w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4" /> Agregar bloqueo
+          </Button>
+        </div>
+
+        {/* Lista de bloqueos */}
+        {bloqueos.length === 0 ? (
+          <p className="text-gray-400 text-center py-4">No hay bloqueos cargados</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {bloqueos.map(b => (
+              <div key={b.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="font-semibold text-gray-800">
+                    {format(new Date(b.fecha + 'T00:00:00'), "d 'de' MMMM yyyy")}
+                    <span className="text-gray-500 font-normal ml-2">
+                      {b.hora_inicio.substring(0, 5)} – {b.hora_fin.substring(0, 5)} hs
+                    </span>
+                  </p>
+                  {b.motivo && <p className="text-sm text-gray-500">{b.motivo}</p>}
+                </div>
+                <button onClick={() => eliminarBloqueo(b.id)}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   )

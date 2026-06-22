@@ -196,16 +196,21 @@ export default function SacarTurnoPage() {
       const diaSemana = format(parseISO(fecha), 'EEEE', { locale: es }).toLowerCase()
       setModalidad(getModalidadPorFecha(fecha, config))
 
-      const [{ data: lotesData }, { data: turnosData }] = await Promise.all([
+      const [{ data: lotesData }, { data: turnosData }, { data: bloqueosData }] = await Promise.all([
         supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden'),
         supabase.from('turnos').select('hora, duracion_minutos')
           .eq('fecha', fecha).in('estado', ['pendiente', 'confirmado']),
+        supabase.from('bloqueos').select('hora_inicio, hora_fin').eq('fecha', fecha),
       ])
 
-      const ocupados = (turnosData || []).map(t => ({
-        hora: t.hora.substring(0, 5),
-        duracion: t.duracion_minutos,
-      }))
+      const ocupados = [
+        ...(turnosData || []).map(t => ({ hora: t.hora.substring(0, 5), duracion: t.duracion_minutos })),
+        ...(bloqueosData || []).map((b: { hora_inicio: string; hora_fin: string }) => {
+          const [hI, mI] = b.hora_inicio.split(':').map(Number)
+          const [hF, mF] = b.hora_fin.split(':').map(Number)
+          return { hora: b.hora_inicio.substring(0, 5), duracion: (hF * 60 + mF) - (hI * 60 + mI) }
+        }),
+      ]
 
       const duracion = esPrimeraTurno ? (config.duracion_primera_consulta_minutos ?? 60) : DURACION
       setHorarios(calcularHorariosEnLotes(lotesData || [], ocupados, duracion, 'seguimiento', 0, false, esPrimeraTurno ? DURACION : undefined))

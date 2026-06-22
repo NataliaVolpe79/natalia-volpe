@@ -171,6 +171,15 @@ export interface Evolucion {
   created_at: string
 }
 
+export interface Bloqueo {
+  id: string
+  fecha: string
+  hora_inicio: string
+  hora_fin: string
+  motivo?: string
+  created_at: string
+}
+
 export interface RecordatorioPendiente {
   turno_id: string
   nombre: string

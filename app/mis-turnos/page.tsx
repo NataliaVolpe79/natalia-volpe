@@ -148,16 +148,25 @@ export default function MisTurnosPage() {
     setModHora('')
     try {
       const diaSemana = format(parseISO(fecha), 'EEEE', { locale: es }).toLowerCase()
-      const [{ data: lotes }, { data: ocupados }] = await Promise.all([
+      const [{ data: lotes }, { data: turnosOcupados }, { data: bloqueosData }] = await Promise.all([
         supabase.from('lotes_horarios').select('*').eq('dia', diaSemana).order('orden'),
         supabase.from('turnos').select('hora, duracion_minutos')
           .eq('fecha', fecha)
           .neq('id', turnoId)
           .in('estado', ['pendiente', 'confirmado']),
+        supabase.from('bloqueos').select('hora_inicio, hora_fin').eq('fecha', fecha),
       ])
+      const ocupados = [
+        ...(turnosOcupados || []).map(t => ({ hora: t.hora.substring(0, 5), duracion: t.duracion_minutos })),
+        ...(bloqueosData || []).map((b: { hora_inicio: string; hora_fin: string }) => {
+          const [hI, mI] = b.hora_inicio.split(':').map(Number)
+          const [hF, mF] = b.hora_fin.split(':').map(Number)
+          return { hora: b.hora_inicio.substring(0, 5), duracion: (hF * 60 + mF) - (hI * 60 + mI) }
+        }),
+      ]
       setModHorarios(calcularHorariosEnLotes(
         lotes || [],
-        (ocupados || []).map(t => ({ hora: t.hora.substring(0, 5), duracion: t.duracion_minutos })),
+        ocupados,
         DURACION, 'seguimiento', 0, false
       ))
     } finally {
