@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { format, parseISO, differenceInHours } from 'date-fns'
+import { format, parseISO, addDays, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Bell, CheckCircle, Phone, Clock, Info } from 'lucide-react'
+import { Bell, CheckCircle, Phone, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { TurnoConPaciente } from '@/lib/types'
+import { Configuracion, TurnoConPaciente } from '@/lib/types'
 import { formatHora, linkWhatsApp } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -13,21 +13,26 @@ import Button from '@/components/ui/Button'
 export default function RecordatoriosPage() {
   const [proximos, setProximos] = useState<{ turno: TurnoConPaciente; tipo: '24h' | '1h' }[]>([])
   const [enviados, setEnviados] = useState<{ turno: TurnoConPaciente; tipo: string }[]>([])
+  const [config, setConfig] = useState<Configuracion | null>(null)
   const [loading, setLoading] = useState(true)
   const [marcando, setMarcando] = useState<string | null>(null)
 
   const cargarRecordatorios = useCallback(async () => {
     setLoading(true)
     try {
+      const { data: cfg } = await supabase.from('configuracion').select('*').single()
+      if (cfg) setConfig(cfg)
+
       const ahora = new Date()
-      const en26h = new Date(ahora.getTime() + 26 * 60 * 60 * 1000)
+      const hoy = format(ahora, 'yyyy-MM-dd')
+      const en3dias = format(addDays(startOfDay(ahora), 3), 'yyyy-MM-dd')
 
       const { data } = await supabase
         .from('turnos')
         .select('*, paciente:pacientes(*)')
         .in('estado', ['pendiente', 'confirmado'])
-        .gte('fecha', format(ahora, 'yyyy-MM-dd'))
-        .lte('fecha', format(en26h, 'yyyy-MM-dd'))
+        .gte('fecha', hoy)
+        .lte('fecha', en3dias)
         .order('fecha')
         .order('hora')
 
@@ -36,12 +41,14 @@ export default function RecordatoriosPage() {
 
       for (const turno of turnos) {
         const fechaHoraTurno = new Date(`${turno.fecha}T${turno.hora}`)
-        const horasRestantes = differenceInHours(fechaHoraTurno, ahora)
+        const yapasoElTurno = fechaHoraTurno < ahora
 
-        if (horasRestantes >= 23 && horasRestantes <= 26 && !turno.recordatorio_24h_enviado) {
+        // 24h: cualquier turno de los próximos 3 días que no se envió y no pasó
+        if (!turno.recordatorio_24h_enviado && !yapasoElTurno) {
           pendientes.push({ turno, tipo: '24h' })
         }
-        if (horasRestantes >= 0.5 && horasRestantes <= 2 && !turno.recordatorio_1h_enviado) {
+        // 1h: solo turnos de hoy que no pasaron y no se enviaron
+        if (turno.fecha === hoy && !turno.recordatorio_1h_enviado && !yapasoElTurno) {
           pendientes.push({ turno, tipo: '1h' })
         }
       }
@@ -87,11 +94,27 @@ export default function RecordatoriosPage() {
     const fecha = format(parseISO(turno.fecha), "EEEE d 'de' MMMM", { locale: es })
     const hora = formatHora(turno.hora)
     const mod = turno.modalidad === 'presencial' ? 'presencial' : 'por videollamada'
+    const nombre = turno.paciente?.nombre ?? ''
+    const esOsde = (turno.paciente?.obra_social ?? '').toLowerCase().includes('osde')
 
-    if (tipo === '24h') {
-      return `Hola ${turno.paciente?.nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (atención ${mod}). Cualquier consulta escribime por acá. ¡Hasta mañana!`
+    const alias = config?.alias_pago ?? 'nat.wert'
+
+    if (esOsde) {
+      const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
+      if (tipo === '24h') {
+        return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* antes de la consulta.\nEnviá tu credencial de OSDE antes de la consulta. ¡Hasta mañana!`
+      }
+      return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).\nCopago OSDE: ${copago} al alias *${alias}*. Enviá tu credencial de OSDE antes de la consulta. ¡Nos vemos pronto!`
     }
-    return `Hola ${turno.paciente?.nombre}! Te recuerdo que en aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}). ¡Nos vemos pronto!`
+
+    // Particular
+    const total = config?.valor_consulta_particular
+    const mitad = total ? `$${Math.round(total / 2)}` : ''
+    const pagoLinea = mitad ? `\nTransferí ${mitad} al alias *${alias}* antes de la consulta.` : ''
+    if (tipo === '24h') {
+      return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${pagoLinea} ¡Hasta mañana!`
+    }
+    return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).${pagoLinea} ¡Nos vemos pronto!`
   }
 
   return (
@@ -100,33 +123,6 @@ export default function RecordatoriosPage() {
         <Bell className="w-7 h-7 text-blue-600" />
         <h1 className="text-2xl font-bold text-gray-900">Recordatorios</h1>
       </div>
-
-      {/* Sección Make.com */}
-      <Card className="border-blue-100 bg-blue-50">
-        <div className="flex items-start gap-3">
-          <Info className="w-6 h-6 text-blue-600 mt-0.5 shrink-0" />
-          <div>
-            <h2 className="font-bold text-blue-900 text-lg mb-2">Automatizar con Make.com</h2>
-            <p className="text-blue-800 text-base mb-3">
-              Podés automatizar el envío de recordatorios por WhatsApp usando Make.com.
-              Configurá un escenario que llame al siguiente endpoint cada hora:
-            </p>
-            <code className="block bg-blue-100 text-blue-900 px-4 py-2 rounded-xl text-sm font-mono break-all mb-3">
-              GET /api/recordatorios/pendientes
-            </code>
-            <p className="text-blue-800 text-sm">
-              Enviá el header: <code className="bg-blue-100 px-1 rounded">x-api-key: TU_RECORDATORIOS_API_KEY</code>
-            </p>
-            <p className="text-blue-800 text-sm mt-2">
-              La respuesta incluye nombre, teléfono, fecha, hora y modalidad de cada turno a recordar.
-              Después marcá cada uno como enviado con:
-            </p>
-            <code className="block bg-blue-100 text-blue-900 px-4 py-2 rounded-xl text-sm font-mono break-all mt-2">
-              PATCH /api/recordatorios/&#123;id&#125;/enviado
-            </code>
-          </div>
-        </div>
-      </Card>
 
       {/* Recordatorios pendientes */}
       <div>
