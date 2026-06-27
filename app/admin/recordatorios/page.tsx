@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { format, parseISO, addDays, startOfDay } from 'date-fns'
+import { format, parseISO, addDays, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Bell, CheckCircle, Phone, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -104,10 +104,14 @@ export default function RecordatoriosPage() {
     const alias = config?.alias_pago ?? 'nat.wert'
     const direccion = turno.modalidad === 'presencial' ? '\nDirección: Av. Rivadavia 5012, piso 4.' : ''
 
+    const diasHasta = differenceInCalendarDays(parseISO(turno.fecha), startOfDay(new Date()))
+    const cuandoEs = diasHasta === 1 ? `mañana ${fecha}` : `el ${fecha}`
+    const despedida = diasHasta === 1 ? '¡Hasta mañana!' : '¡Nos vemos pronto!'
+
     if (esOsde) {
       const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
       if (tipo === '24h') {
-        return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${direccion}\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* (que está a nombre de Simon Fernandez).\nCompartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ¡Hasta mañana!`
+        return `Hola ${nombre}! Te recuerdo que ${cuandoEs} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${direccion}\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* (que está a nombre de Simon Fernandez).\nCompartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ${despedida}`
       }
       return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).${direccion}\nCopago OSDE: ${copago} al alias *${alias}* (que está a nombre de Simon Fernandez). Compartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ¡Nos vemos pronto!`
     }
@@ -117,7 +121,7 @@ export default function RecordatoriosPage() {
     const mitad = total ? `$${Math.round(total / 2)}` : ''
     const pagoLinea = mitad ? `\nTransferí ${mitad} al alias *${alias}* (que está a nombre de Simon Fernandez) antes de la consulta.` : ''
     if (tipo === '24h') {
-      return `Hola ${nombre}! Te recuerdo que mañana ${fecha} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${direccion}${pagoLinea} ¡Hasta mañana!`
+      return `Hola ${nombre}! Te recuerdo que ${cuandoEs} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${direccion}${pagoLinea} ${despedida}`
     }
     return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).${direccion}${pagoLinea} ¡Nos vemos pronto!`
   }
