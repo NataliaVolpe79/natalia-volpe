@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { format, parseISO, addDays, addWeeks, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, getDay, isToday } from 'date-fns'
+import { format, parseISO, addDays, addWeeks, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, getDay, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus, Clock, Check, X, Edit2, Video, MapPin, Calendar, LayoutList } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -32,7 +32,6 @@ export default function TurnosPage() {
   const [fechaRef, setFechaRef] = useState(new Date())
   const [fechaSeleccionada, setFechaSeleccionada] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [turnos, setTurnos] = useState<TurnoConPaciente[]>([])
-  const [turnosSemana, setTurnosSemana] = useState<TurnoConPaciente[]>([])
   const [diasConTurnos, setDiasConTurnos] = useState<Record<string, number>>({})
   const [config, setConfig] = useState<Configuracion | null>(null)
   const [loading, setLoading] = useState(false)
@@ -65,7 +64,6 @@ export default function TurnosPage() {
         .lte('fecha', fin)
         .order('hora')
       const t = (data || []).map(x => ({ ...x, pago: Array.isArray(x.pago) ? x.pago[0] : x.pago })) as TurnoConPaciente[]
-      setTurnosSemana(t)
       const conteo: Record<string, number> = {}
       t.forEach(x => { conteo[x.fecha] = (conteo[x.fecha] || 0) + 1 })
       setDiasConTurnos(prev => ({ ...prev, ...conteo }))
