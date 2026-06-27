@@ -26,9 +26,10 @@ export default function RecordatoriosPage() {
       const ahora = new Date()
       const hoy = format(ahora, 'yyyy-MM-dd')
 
-      // Viernes (5) → mostrar lunes (3 días); cualquier otro día → mañana (1 día)
-      const esViernes = ahora.getDay() === 5
-      const proximoDiaLaboral = format(addDays(startOfDay(ahora), esViernes ? 3 : 1), 'yyyy-MM-dd')
+      // Vie→+3, Sáb→+2, cualquier otro (incluye Dom)→+1
+      const diaSemana = ahora.getDay() // 0=dom, 1=lun, ..., 5=vie, 6=sáb
+      const diasHasta = diaSemana === 5 ? 3 : diaSemana === 6 ? 2 : 1
+      const proximoDiaLaboral = format(addDays(startOfDay(ahora), diasHasta), 'yyyy-MM-dd')
 
       const { data } = await supabase
         .from('turnos')
