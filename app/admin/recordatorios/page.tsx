@@ -25,7 +25,7 @@ export default function RecordatoriosPage() {
 
       const ahora = new Date()
       const hoy = format(ahora, 'yyyy-MM-dd')
-      const en3dias = format(addDays(startOfDay(ahora), 4), 'yyyy-MM-dd')
+      const en3dias = format(addDays(startOfDay(ahora), 7), 'yyyy-MM-dd')
 
       const { data } = await supabase
         .from('turnos')
