@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { format, parseISO, differenceInHours, addDays, startOfDay } from 'date-fns'
+import { format, parseISO, addDays, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Bell, CheckCircle, Phone, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -25,14 +25,18 @@ export default function RecordatoriosPage() {
 
       const ahora = new Date()
       const hoy = format(ahora, 'yyyy-MM-dd')
-      const manana = format(addDays(startOfDay(ahora), 1), 'yyyy-MM-dd')
+
+      // Vie→+3, Sáb→+2, cualquier otro (incluye Dom)→+1
+      const diaSemana = ahora.getDay() // 0=dom, 1=lun, ..., 5=vie, 6=sáb
+      const diasHasta = diaSemana === 5 ? 3 : diaSemana === 6 ? 2 : 1
+      const proximoDiaLaboral = format(addDays(startOfDay(ahora), diasHasta), 'yyyy-MM-dd')
 
       const { data } = await supabase
         .from('turnos')
         .select('*, paciente:pacientes(*)')
         .in('estado', ['pendiente', 'confirmado'])
         .gte('fecha', hoy)
-        .lte('fecha', manana)
+        .lte('fecha', proximoDiaLaboral)
         .order('fecha')
         .order('hora')
 
@@ -41,14 +45,14 @@ export default function RecordatoriosPage() {
 
       for (const turno of turnos) {
         const fechaHoraTurno = new Date(`${turno.fecha}T${turno.hora}`)
-        const horasRestantes = differenceInHours(fechaHoraTurno, ahora)
+        const yapasoElTurno = fechaHoraTurno < ahora
 
-        // 24h: todos los turnos de mañana que no fueron recordados
-        if (turno.fecha === manana && !turno.recordatorio_24h_enviado) {
+        // 24h: próximo día laboral + hoy si no se envió ayer y todavía no pasó
+        if (!turno.recordatorio_24h_enviado && (turno.fecha === proximoDiaLaboral || (turno.fecha === hoy && !yapasoElTurno))) {
           pendientes.push({ turno, tipo: '24h' })
         }
-        // 1h: turnos de hoy en las próximas 2 horas que no fueron recordados
-        if (turno.fecha === hoy && horasRestantes >= 0 && horasRestantes <= 2 && !turno.recordatorio_1h_enviado) {
+        // 1h: turnos de hoy que no pasaron y no se enviaron
+        if (turno.fecha === hoy && !turno.recordatorio_1h_enviado && !yapasoElTurno) {
           pendientes.push({ turno, tipo: '1h' })
         }
       }
