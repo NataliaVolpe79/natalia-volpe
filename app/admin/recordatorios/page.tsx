@@ -25,14 +25,17 @@ export default function RecordatoriosPage() {
 
       const ahora = new Date()
       const hoy = format(ahora, 'yyyy-MM-dd')
-      const en3dias = format(addDays(startOfDay(ahora), 7), 'yyyy-MM-dd')
+
+      // Viernes (5) → mostrar lunes (3 días); cualquier otro día → mañana (1 día)
+      const esViernes = ahora.getDay() === 5
+      const proximoDiaLaboral = format(addDays(startOfDay(ahora), esViernes ? 3 : 1), 'yyyy-MM-dd')
 
       const { data } = await supabase
         .from('turnos')
         .select('*, paciente:pacientes(*)')
         .in('estado', ['pendiente', 'confirmado'])
         .gte('fecha', hoy)
-        .lte('fecha', en3dias)
+        .lte('fecha', proximoDiaLaboral)
         .order('fecha')
         .order('hora')
 
@@ -43,8 +46,8 @@ export default function RecordatoriosPage() {
         const fechaHoraTurno = new Date(`${turno.fecha}T${turno.hora}`)
         const yapasoElTurno = fechaHoraTurno < ahora
 
-        // 24h: cualquier turno de los próximos 3 días que no se envió y no pasó
-        if (!turno.recordatorio_24h_enviado && !yapasoElTurno) {
+        // 24h: próximo día laboral + hoy si no se envió ayer y todavía no pasó
+        if (!turno.recordatorio_24h_enviado && (turno.fecha === proximoDiaLaboral || (turno.fecha === hoy && !yapasoElTurno))) {
           pendientes.push({ turno, tipo: '24h' })
         }
         // 1h: solo turnos de hoy que no pasaron y no se enviaron
