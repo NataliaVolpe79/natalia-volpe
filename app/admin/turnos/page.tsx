@@ -318,6 +318,9 @@ export default function TurnosPage() {
                     <p className={`text-xs font-semibold truncate mt-0.5 leading-tight ${item.turno.estado === 'cancelado' ? 'text-gray-400 line-through' : 'text-blue-900'}`}>
                       {item.turno.paciente?.nombre} {item.turno.paciente?.apellido}
                     </p>
+                    <p className={`text-[10px] mt-0.5 ${item.turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-500'}`}>
+                      {item.turno.paciente?.obra_social?.toLowerCase().includes('osde') ? 'OSDE' : 'Particular'}
+                    </p>
                     <p className={`text-[10px] mt-0.5 ${item.turno.estado === 'completado' ? 'text-green-600' : item.turno.estado === 'cancelado' ? 'text-gray-400' : 'text-blue-600'}`}>{item.turno.duracion_minutos}min</p>
                   </div>
                 ) : item.esContinuacion ? (

@@ -38,6 +38,7 @@ export default function MisTurnosPage() {
   const [encontrado, setEncontrado] = useState(false)
   const [cancelando, setCancelando] = useState<string | null>(null)
   const [canceladoWA, setCanceladoWA] = useState<string | null>(null)
+  const [bloqueadoWA, setBloqueadoWA] = useState<string | null>(null)
 
   // Modificar turno
   const [config, setConfig] = useState<Configuracion | null>(null)
@@ -112,9 +113,14 @@ export default function MisTurnosPage() {
     }
   }
 
-  async function cancelarTurno(id: string) {
+  async function cancelarTurno(id: string, puedeModificar: boolean) {
     const turno = turnos.find(t => t.id === id)
     if (!turno) return
+    if (!puedeModificar) {
+      const msg = `Hola! Quisiera cancelar mi turno del ${formatFecha(turno.fecha)} a las ${turno.hora.substring(0, 5)} hs. No pude hacerlo desde la app porque es en menos de 24 horas.`
+      setBloqueadoWA(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`)
+      return
+    }
     setCancelando(id)
     try {
       await supabase.from('turnos').update({ estado: 'cancelado' }).eq('id', id)
@@ -122,6 +128,7 @@ export default function MisTurnosPage() {
       const msg = `Hola Dra. Volpe! ${nombrePaciente} canceló su turno del ${formatFecha(turno.fecha)} a las ${turno.hora.substring(0, 5)} hs.`
       setCanceladoWA(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`)
       setModificadoWA(null)
+      setBloqueadoWA(null)
     } finally {
       setCancelando(null)
     }
@@ -397,16 +404,16 @@ export default function MisTurnosPage() {
                         </div>
 
                         {/* Botones cancelar / modificar */}
-                        {puedeModificar && (
-                          <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100">
-                            <button
-                              onClick={() => cancelarTurno(turno.id)}
-                              disabled={cancelando === turno.id}
-                              className="flex items-center gap-1.5 text-red-500 hover:text-red-700 text-sm font-semibold transition-colors disabled:opacity-50"
-                            >
-                              <X className="w-4 h-4" />
-                              {cancelando === turno.id ? 'Cancelando...' : 'Cancelar'}
-                            </button>
+                        <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100">
+                          <button
+                            onClick={() => cancelarTurno(turno.id, puedeModificar)}
+                            disabled={cancelando === turno.id}
+                            className="flex items-center gap-1.5 text-red-500 hover:text-red-700 text-sm font-semibold transition-colors disabled:opacity-50"
+                          >
+                            <X className="w-4 h-4" />
+                            {cancelando === turno.id ? 'Cancelando...' : 'Cancelar'}
+                          </button>
+                          {puedeModificar && (
                             <button
                               onClick={() => iniciarModificacion(turno.id)}
                               className={`flex items-center gap-1.5 text-sm font-semibold transition-colors ${modificando === turno.id ? 'text-gray-500' : 'text-blue-500 hover:text-blue-700'}`}
@@ -414,6 +421,14 @@ export default function MisTurnosPage() {
                               <Edit2 className="w-4 h-4" />
                               {modificando === turno.id ? 'Cancelar cambio' : 'Modificar'}
                             </button>
+                          )}
+                        </div>
+                        {bloqueadoWA && (
+                          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl text-sm">
+                            <p className="text-orange-800 font-medium mb-2">Tu turno es en menos de 24 horas. Para cancelarlo o modificarlo, comunicate con nosotros por WhatsApp.</p>
+                            <a href={bloqueadoWA} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 bg-green-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-green-600 transition-colors">
+                              <Phone className="w-4 h-4" /> Contactar por WhatsApp
+                            </a>
                           </div>
                         )}
 
