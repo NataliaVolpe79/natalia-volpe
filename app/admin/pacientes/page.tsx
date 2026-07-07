@@ -107,6 +107,10 @@ function PacientesPageInner() {
       setError('Nombre, apellido y teléfono son obligatorios')
       return
     }
+    if (!form.obra_social) {
+      setError('Seleccioná la cobertura del paciente (Particular u OSDE)')
+      return
+    }
     setGuardando(true)
     setError('')
     try {
@@ -244,15 +248,15 @@ function PacientesPageInner() {
             onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-base font-semibold text-gray-700 block mb-1.5">Obra social</label>
+              <label className="text-base font-semibold text-gray-700 block mb-1.5">Cobertura *</label>
               <select
                 value={form.obra_social}
                 onChange={e => setForm(f => ({ ...f, obra_social: e.target.value }))}
                 className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
               >
-                <option value="">Sin obra social</option>
-                <option value="OSDE">OSDE</option>
+                <option value="">Seleccionar...</option>
                 <option value="Particular">Particular</option>
+                <option value="OSDE">OSDE</option>
               </select>
             </div>
             <Input label="N° afiliado" value={form.numero_afiliado}
@@ -331,6 +335,10 @@ function PacienteDetalle({
   async function guardarEditDatos() {
     if (!editForm.nombre.trim() || !editForm.apellido.trim() || !editForm.telefono.trim()) {
       setErrorEdit('Nombre, apellido y teléfono son obligatorios')
+      return
+    }
+    if (!editForm.obra_social) {
+      setErrorEdit('Seleccioná la cobertura del paciente (Particular u OSDE)')
       return
     }
     setGuardandoEdit(true)
@@ -450,15 +458,15 @@ function PacienteDetalle({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-base font-semibold text-gray-700 block mb-1.5">Obra social</label>
+              <label className="text-base font-semibold text-gray-700 block mb-1.5">Cobertura *</label>
               <select
                 value={editForm.obra_social}
                 onChange={e => setEditForm(f => ({ ...f, obra_social: e.target.value }))}
                 className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
               >
-                <option value="">Sin obra social</option>
-                <option value="OSDE">OSDE</option>
+                <option value="">Seleccionar...</option>
                 <option value="Particular">Particular</option>
+                <option value="OSDE">OSDE</option>
               </select>
             </div>
             <Input label="N° afiliado" value={editForm.numero_afiliado}

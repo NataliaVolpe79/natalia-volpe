@@ -163,9 +163,17 @@ export default function RecordatoriosPage() {
                       {tipo === '24h' ? '24 hs' : '1 hs'}
                     </div>
                     <div className="flex-1">
-                      <p className="font-bold text-gray-900">
-                        {turno.paciente?.nombre} {turno.paciente?.apellido}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-gray-900">
+                          {turno.paciente?.nombre} {turno.paciente?.apellido}
+                        </p>
+                        {turno.paciente?.obra_social
+                          ? <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${turno.paciente.obra_social.toLowerCase().includes('osde') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {turno.paciente.obra_social.toLowerCase().includes('osde') ? 'OSDE' : 'Particular'}
+                            </span>
+                          : <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">⚠️ Sin cobertura</span>
+                        }
+                      </div>
                       <div className="flex items-center gap-2 text-gray-500 text-sm mt-0.5">
                         <Clock className="w-4 h-4" />
                         <span className="capitalize">
