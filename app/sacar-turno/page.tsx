@@ -72,8 +72,7 @@ export default function SacarTurnoPage() {
         if (cfgRes.data) setConfig(cfgRes.data)
         if (pacRes.data) {
           setPaciente(pacRes.data as Paciente)
-          setEsPrimeraTurno(false)
-          setPaso(2)
+          setPaso('consulta')
         } else {
           localStorage.removeItem(STORAGE_KEY)
         }
@@ -118,9 +117,8 @@ export default function SacarTurnoPage() {
 
       if (pacienteRes.data) {
         setPaciente(pacienteRes.data as Paciente)
-        setEsPrimeraTurno(false)
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ telefono: tel, paciente: pacienteRes.data }))
-        setPaso(2)
+        setPaso('consulta')
       } else {
         setEsPrimeraTurno(true)
         setPaso(1)
@@ -395,11 +393,10 @@ export default function SacarTurnoPage() {
           <button
             onClick={() => {
               if (paso === 0 || paso === 4) return router.push('/')
-              if (paso === 'consulta') return setPaso(1)
+              if (paso === 'consulta') return esNuevoPaciente ? setPaso(1) : setPaso(0)
               if (paso === 'info') return setPaso('consulta')
               if (paso === 2 && esPrimeraTurno) return setPaso('info')
-              if (paso === 2 && esNuevoPaciente) return setPaso('consulta')
-              if (paso === 2 && paciente) return router.push('/')
+              if (paso === 2) return setPaso('consulta')
               if (paso === 3) return setPaso(2)
               setPaso(p => (typeof p === 'number' ? p - 1 : 1) as typeof paso)
             }}
