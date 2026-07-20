@@ -51,6 +51,9 @@ export default function TurnosPage() {
   const [linksWA, setLinksWA] = useState<{ nombre: string; url: string }[]>([])
   const [turnoAcciones, setTurnoAcciones] = useState<TurnoConPaciente | null>(null)
   const [turnoModificar, setTurnoModificar] = useState<TurnoConPaciente | null>(null)
+  const [turnosCancelados, setTurnosCancelados] = useState<TurnoConPaciente[]>([])
+  const [bloqueando, setBloqueando] = useState(false)
+  const [bloqueado, setBloqueado] = useState(false)
 
   const cargarConfig = useCallback(async () => {
     const { data } = await supabase.from('configuracion').select('*').single()
@@ -161,10 +164,28 @@ export default function TurnosPage() {
         return { nombre, url: linkWhatsApp(t.paciente!.telefono!, msg) }
       })
 
+    setTurnosCancelados(turnosACancelar)
+    setBloqueado(false)
     setLinksWA(links)
     cargarTurnosDia(fechaSeleccionada)
     if (vista === 'semana') cargarTurnosSemana(fechaRef)
     else cargarDiasConTurnosMes(fechaRef)
+  }
+
+  async function bloquearHorariosCancelados() {
+    setBloqueando(true)
+    for (const t of turnosCancelados) {
+      const horaIni = t.hora.substring(0, 5)
+      const horaFinMins = timeToMinutes(horaIni) + t.duracion_minutos
+      await supabase.from('bloqueos').insert({
+        fecha: t.fecha,
+        hora_inicio: horaIni,
+        hora_fin: minutesToTime(horaFinMins),
+        motivo: 'Turno cancelado',
+      })
+    }
+    setBloqueando(false)
+    setBloqueado(true)
   }
 
   async function cambiarEstado(id: string, estado: EstadoTurno) {
@@ -609,7 +630,7 @@ export default function TurnosPage() {
 
       <Modal
         isOpen={!!modalCancelar}
-        onClose={() => { setModalCancelar(null); setLinksWA([]) }}
+        onClose={() => { setModalCancelar(null); setLinksWA([]); setTurnosCancelados([]); setBloqueado(false) }}
         title={modalCancelar?.modo === 'dia' ? 'Cancelar todos los turnos del día' : 'Cancelar turno'}
       >
         {linksWA.length === 0 ? (
@@ -647,7 +668,14 @@ export default function TurnosPage() {
                 </a>
               ))}
             </div>
-            <Button fullWidth onClick={() => { setModalCancelar(null); setLinksWA([]) }}>Listo</Button>
+            {bloqueado ? (
+              <p className="text-center text-sm text-green-700 font-semibold">✓ Horario bloqueado — no se puede reservar online</p>
+            ) : (
+              <Button variant="secondary" fullWidth onClick={bloquearHorariosCancelados} loading={bloqueando}>
+                🔒 Bloquear {turnosCancelados.length > 1 ? 'estos horarios' : 'este horario'} para turnos online
+              </Button>
+            )}
+            <Button fullWidth onClick={() => { setModalCancelar(null); setLinksWA([]); setTurnosCancelados([]); setBloqueado(false) }}>Listo</Button>
           </div>
         )}
       </Modal>

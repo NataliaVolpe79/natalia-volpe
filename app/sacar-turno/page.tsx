@@ -266,7 +266,7 @@ export default function SacarTurnoPage() {
         const sinDisp = new Set<string>()
         for (const dia of dias) {
           const fechaStr = format(dia, 'yyyy-MM-dd')
-          if (!esDiaLaborable(fechaStr, config) || isBefore(dia, hoy)) continue
+          if (!esDiaLaborable(fechaStr, config) || isBefore(dia, addDays(hoy, 1))) continue
           const diaNombre = format(dia, 'EEEE', { locale: es }).toLowerCase()
           const lotesDelDia = lotesAll.filter(l => l.dia === diaNombre)
           const ocupados = (turnosDelMes || [])
@@ -328,7 +328,7 @@ export default function SacarTurnoPage() {
           {Array.from({ length: primerDia }).map((_, i) => <div key={`e${i}`} />)}
           {dias.map(dia => {
             const fechaStr = format(dia, 'yyyy-MM-dd')
-            const esLaborable = esDiaLaborable(fechaStr, config) && !isBefore(dia, hoy)
+            const esLaborable = esDiaLaborable(fechaStr, config) && !isBefore(dia, addDays(hoy, 1))
             const estaLleno = diasSinDisponibilidad.has(fechaStr)
             const esDisponibleParaPaciente = fechaStr >= '2026-07-01'
             const disponible = esLaborable && !estaLleno && esDisponibleParaPaciente
