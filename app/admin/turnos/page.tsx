@@ -54,6 +54,7 @@ export default function TurnosPage() {
   const [turnosCancelados, setTurnosCancelados] = useState<TurnoConPaciente[]>([])
   const [bloqueando, setBloqueando] = useState(false)
   const [bloqueado, setBloqueado] = useState(false)
+  const [slotParaAccion, setSlotParaAccion] = useState<{ fecha: string; hora: string } | null>(null)
 
   const cargarConfig = useCallback(async () => {
     const { data } = await supabase.from('configuracion').select('*').single()
@@ -170,6 +171,19 @@ export default function TurnosPage() {
     cargarTurnosDia(fechaSeleccionada)
     if (vista === 'semana') cargarTurnosSemana(fechaRef)
     else cargarDiasConTurnosMes(fechaRef)
+  }
+
+  async function bloquearSlot(fecha: string, hora: string) {
+    const horaFinMins = timeToMinutes(hora) + DURACION_SLOT
+    await supabase.from('bloqueos').insert({
+      fecha,
+      hora_inicio: hora,
+      hora_fin: minutesToTime(horaFinMins),
+      motivo: 'Horario bloqueado',
+    })
+    setSlotParaAccion(null)
+    cargarTurnosDia(fecha)
+    if (vista === 'semana') cargarTurnosSemana(fechaRef)
   }
 
   async function bloquearHorariosCancelados() {
@@ -356,14 +370,10 @@ export default function TurnosPage() {
                   <button
                     key={item.hora}
                     className="px-2 py-2 bg-green-50 border border-dashed border-green-200 rounded-lg hover:bg-green-100 hover:border-green-400 transition-all text-left group"
-                    onClick={() => {
-                      setFechaSeleccionada(fechaStr)
-                      setHoraSlot(item.hora)
-                      setModalNuevoTurno(true)
-                    }}
+                    onClick={() => { setFechaSeleccionada(fechaStr); setSlotParaAccion({ fecha: fechaStr, hora: item.hora }) }}
                   >
                     <p className="text-xs font-bold text-green-700 leading-none">{item.hora}</p>
-                    <p className="text-[10px] text-green-500 group-hover:text-green-700 mt-0.5">+ Asignar</p>
+                    <p className="text-[10px] text-green-500 group-hover:text-green-700 mt-0.5">+ Acción</p>
                   </button>
                 )
               )}
@@ -476,10 +486,10 @@ export default function TurnosPage() {
               </div>
               <span className="text-green-700 font-semibold text-sm flex-1">Disponible</span>
               <button
-                onClick={() => { setHoraSlot(item.hora); setModalNuevoTurno(true) }}
+                onClick={() => setSlotParaAccion({ fecha: fechaSeleccionada, hora: item.hora })}
                 className="text-xs text-green-600 font-bold hover:text-green-800 px-2 py-1 rounded-lg hover:bg-green-100"
               >
-                + Asignar
+                + Acción
               </button>
             </div>
           )
@@ -787,6 +797,17 @@ export default function TurnosPage() {
           turnoExistente={turnoModificar}
         />
       )}
+
+      <Modal isOpen={!!slotParaAccion} onClose={() => setSlotParaAccion(null)} title={`Horario ${slotParaAccion?.hora}`}>
+        <div className="flex flex-col gap-3">
+          <Button fullWidth onClick={() => { setHoraSlot(slotParaAccion!.hora); setSlotParaAccion(null); setModalNuevoTurno(true) }}>
+            + Nuevo turno
+          </Button>
+          <Button fullWidth variant="secondary" onClick={() => bloquearSlot(slotParaAccion!.fecha, slotParaAccion!.hora)}>
+            🔒 Bloquear horario (no disponible online)
+          </Button>
+        </div>
+      </Modal>
 
       <Modal isOpen={!!turnoEditar} onClose={() => setTurnoEditar(null)} title="Editar notas del turno">
         <div className="flex flex-col gap-4">
