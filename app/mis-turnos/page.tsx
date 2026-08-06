@@ -123,7 +123,8 @@ export default function MisTurnosPage() {
     }
     setCancelando(id)
     try {
-      await supabase.from('turnos').update({ estado: 'cancelado' }).eq('id', id)
+      const { error: e, count } = await supabase.from('turnos').update({ estado: 'cancelado' }, { count: 'exact' }).eq('id', id)
+      if (e || count === 0) { setError('No se pudo cancelar el turno. Intentá de nuevo o contactanos por WhatsApp.'); return }
       setTurnos(t => t.filter(x => x.id !== id))
       const msg = `Hola Dra. Volpe! ${nombrePaciente} canceló su turno del ${formatFecha(turno.fecha)} a las ${turno.hora.substring(0, 5)} hs.`
       setCanceladoWA(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`)
