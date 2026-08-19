@@ -107,18 +107,35 @@ export default function RecordatoriosPage() {
     const diasHasta = differenceInCalendarDays(parseISO(turno.fecha), startOfDay(new Date()))
     const cuandoEs = diasHasta === 1 ? `mañana ${fecha}` : `el ${fecha}`
     const despedida = diasHasta === 1 ? '¡Hasta mañana!' : '¡Nos vemos pronto!'
+    const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
+    const total = config?.valor_consulta_particular
+    const mitad = total ? `$${Math.round(total / 2)}` : ''
+
+    function aplicarVariables(template: string): string {
+      return template
+        .replace(/\{nombre\}/g, nombre)
+        .replace(/\{fecha\}/g, fecha)
+        .replace(/\{hora\}/g, hora)
+        .replace(/\{modalidad\}/g, mod)
+        .replace(/\{cuandoEs\}/g, cuandoEs)
+        .replace(/\{despedida\}/g, despedida)
+        .replace(/\{alias\}/g, alias)
+        .replace(/\{direccion\}/g, direccion)
+        .replace(/\{copago\}/g, copago)
+        .replace(/\{mitad\}/g, mitad)
+    }
 
     if (esOsde) {
-      const copago = config?.copago_osde ? `$${config.copago_osde}` : '$8900'
+      const key = tipo === '24h' ? 'mensaje_recordatorio_osde_24h' : 'mensaje_recordatorio_osde_1h'
+      if (config?.[key]) return aplicarVariables(config[key]!)
       if (tipo === '24h') {
         return `Hola ${nombre}! Te recuerdo que ${cuandoEs} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${direccion}\nEl copago de OSDE es ${copago} — transferí al alias *${alias}* (que está a nombre de Simon Fernandez).\nCompartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ${despedida}`
       }
       return `Hola ${nombre}! En aprox. 1 hora, a las ${hora} hs, tenés tu turno con la Dra. Natalia Volpe (${mod}).${direccion}\nCopago OSDE: ${copago} al alias *${alias}* (que está a nombre de Simon Fernandez). Compartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ¡Nos vemos pronto!`
     }
 
-    // Particular
-    const total = config?.valor_consulta_particular
-    const mitad = total ? `$${Math.round(total / 2)}` : ''
+    const key = tipo === '24h' ? 'mensaje_recordatorio_particular_24h' : 'mensaje_recordatorio_particular_1h'
+    if (config?.[key]) return aplicarVariables(config[key]!)
     const pagoLinea = mitad ? `\nTransferí ${mitad} al alias *${alias}* (que está a nombre de Simon Fernandez) antes de la consulta.` : ''
     if (tipo === '24h') {
       return `Hola ${nombre}! Te recuerdo que ${cuandoEs} tenés turno con la Dra. Natalia Volpe a las ${hora} hs (${mod}).${direccion}${pagoLinea} ${despedida}`

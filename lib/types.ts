@@ -19,6 +19,10 @@ export interface Configuracion {
   alias_pago?: string
   dni_credencial?: string
   valor_consulta_particular?: number
+  mensaje_recordatorio_osde_24h?: string
+  mensaje_recordatorio_osde_1h?: string
+  mensaje_recordatorio_particular_24h?: string
+  mensaje_recordatorio_particular_1h?: string
   updated_at: string
 }
 

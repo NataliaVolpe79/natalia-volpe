@@ -134,6 +134,28 @@ export default function ConfiguracionPage() {
     }
   }
 
+  async function guardarMensajes() {
+    if (!config) return
+    setGuardando(true)
+    setError('')
+    try {
+      const { error: e } = await supabase.from('configuracion').update({
+        mensaje_recordatorio_osde_24h: config.mensaje_recordatorio_osde_24h || null,
+        mensaje_recordatorio_osde_1h: config.mensaje_recordatorio_osde_1h || null,
+        mensaje_recordatorio_particular_24h: config.mensaje_recordatorio_particular_24h || null,
+        mensaje_recordatorio_particular_1h: config.mensaje_recordatorio_particular_1h || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', config.id)
+      if (e) throw e
+      setExito('mensajes')
+      setTimeout(() => setExito(''), 3000)
+    } catch {
+      setError('No se pudo guardar los mensajes')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   function agregarFeriado() {
     if (!config || !nuevoFeriado) return
     if (config.feriados.includes(nuevoFeriado)) return
@@ -291,6 +313,7 @@ export default function ConfiguracionPage() {
       {exito === 'config' && <Alert type="success">¡Configuración guardada!</Alert>}
       {exito === 'lote' && <Alert type="success">¡Bloque de horario guardado!</Alert>}
       {exito === 'pagos' && <Alert type="success">¡Datos de pago guardados!</Alert>}
+      {exito === 'mensajes' && <Alert type="success">¡Mensajes guardados!</Alert>}
       {error && <Alert type="error">{error}</Alert>}
 
       {/* ============ SECCIÓN 1: Días de atención ============ */}
@@ -618,7 +641,40 @@ export default function ConfiguracionPage() {
           <Save className="w-5 h-5" /> Guardar feriados
         </Button>
       </Card>
-      {/* ============ SECCIÓN 5: Bloqueos de horario ============ */}
+      {/* ============ SECCIÓN 5: Mensajes de recordatorio ============ */}
+      <Card>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Mensajes de recordatorio</h2>
+        <p className="text-sm text-gray-500 mb-1">
+          Personalizá los mensajes de WhatsApp. Si lo dejás vacío, se usa el mensaje por defecto.
+        </p>
+        <p className="text-xs text-gray-400 mb-4">
+          Variables disponibles: <code className="bg-gray-100 px-1 rounded">{'{nombre}'}</code> <code className="bg-gray-100 px-1 rounded">{'{fecha}'}</code> <code className="bg-gray-100 px-1 rounded">{'{hora}'}</code> <code className="bg-gray-100 px-1 rounded">{'{modalidad}'}</code> <code className="bg-gray-100 px-1 rounded">{'{cuandoEs}'}</code> <code className="bg-gray-100 px-1 rounded">{'{alias}'}</code> <code className="bg-gray-100 px-1 rounded">{'{copago}'}</code> <code className="bg-gray-100 px-1 rounded">{'{mitad}'}</code> <code className="bg-gray-100 px-1 rounded">{'{direccion}'}</code> <code className="bg-gray-100 px-1 rounded">{'{despedida}'}</code>
+        </p>
+        <div className="flex flex-col gap-4">
+          {[
+            { key: 'mensaje_recordatorio_osde_24h' as const, label: 'OSDE — recordatorio 24 hs antes' },
+            { key: 'mensaje_recordatorio_osde_1h' as const, label: 'OSDE — recordatorio 1 hs antes' },
+            { key: 'mensaje_recordatorio_particular_24h' as const, label: 'Particular — recordatorio 24 hs antes' },
+            { key: 'mensaje_recordatorio_particular_1h' as const, label: 'Particular — recordatorio 1 hs antes' },
+          ].map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
+              <textarea
+                rows={4}
+                value={config[key] ?? ''}
+                onChange={e => setConfig({ ...config, [key]: e.target.value })}
+                placeholder="Dejá vacío para usar el mensaje por defecto"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
+              />
+            </div>
+          ))}
+        </div>
+        <Button variant="success" className="mt-4 w-full sm:w-auto" onClick={guardarMensajes} loading={guardando}>
+          <Save className="w-5 h-5" /> Guardar mensajes
+        </Button>
+      </Card>
+
+      {/* ============ SECCIÓN 6: Bloqueos de horario ============ */}
       <Card>
         <h2 className="text-lg font-bold text-gray-900 mb-1">Bloqueos de horario</h2>
         <p className="text-sm text-gray-500 mb-4">
