@@ -11,6 +11,17 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Alert from '@/components/ui/Alert'
 
+const MENSAJES_DEFAULT = {
+  mensaje_recordatorio_osde_24h:
+    'Hola {nombre}! Te recuerdo que {cuandoEs} tenés turno con la Dra. Natalia Volpe a las {hora} hs ({modalidad}).{direccion}\nEl copago de OSDE es {copago} — transferí al alias *{alias}* (que está a nombre de Simon Fernandez).\nCompartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. {despedida}',
+  mensaje_recordatorio_osde_1h:
+    'Hola {nombre}! En aprox. 1 hora, a las {hora} hs, tenés tu turno con la Dra. Natalia Volpe ({modalidad}).{direccion}\nCopago OSDE: {copago} al alias *{alias}* (que está a nombre de Simon Fernandez). Compartí tu credencial de OSDE desde la app con el DNI 27308144 antes de la consulta a este wpp. ¡Nos vemos pronto!',
+  mensaje_recordatorio_particular_24h:
+    'Hola {nombre}! Te recuerdo que {cuandoEs} tenés turno con la Dra. Natalia Volpe a las {hora} hs ({modalidad}).{direccion}\nTransferí {mitad} al alias *{alias}* (que está a nombre de Simon Fernandez) antes de la consulta. {despedida}',
+  mensaje_recordatorio_particular_1h:
+    'Hola {nombre}! En aprox. 1 hora, a las {hora} hs, tenés tu turno con la Dra. Natalia Volpe ({modalidad}).{direccion}\nTransferí {mitad} al alias *{alias}* (que está a nombre de Simon Fernandez) antes de la consulta. ¡Nos vemos pronto!',
+}
+
 const DIAS_SEMANA = [
   { id: 'lunes', label: 'Lunes' },
   { id: 'martes', label: 'Martes' },
@@ -661,9 +672,8 @@ export default function ConfiguracionPage() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
               <textarea
                 rows={4}
-                value={config[key] ?? ''}
+                value={config[key] ?? MENSAJES_DEFAULT[key]}
                 onChange={e => setConfig({ ...config, [key]: e.target.value })}
-                placeholder="Dejá vacío para usar el mensaje por defecto"
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
               />
             </div>
